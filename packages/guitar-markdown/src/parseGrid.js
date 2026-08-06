@@ -1,0 +1,34 @@
+function parseRow(line) {
+  let content = line;
+  let repeatCount = null;
+
+  const countMatch = content.match(/\s*[x×]\s*(\d+)\s*$/i);
+  if (countMatch) {
+    repeatCount = countMatch[1];
+    content = content.slice(0, countMatch.index);
+  }
+
+  const repeatStart = content.startsWith("||:");
+  if (repeatStart) content = content.slice(3);
+  const repeatEnd = content.endsWith(":||");
+  if (repeatEnd) content = content.slice(0, -3);
+
+  const cells = content.split("|").map(cell => cell.trim()).filter(Boolean);
+  if (!cells.length) throw new Error(`Ligne de grille invalide : « ${line} »`);
+
+  return { cells, repeat: repeatStart || repeatEnd, repeatCount };
+}
+
+export function parseChordGrid(source) {
+  const rows = source
+    .split(/\r?\n/)
+    .map(line => line.trim())
+    .filter(Boolean)
+    .map(parseRow);
+
+  if (!rows.length) {
+    throw new Error("Grille invalide : aucune ligne trouvée.");
+  }
+
+  return { type: "grid", rows };
+}

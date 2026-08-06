@@ -1,0 +1,41 @@
+{
+  "name": "guitar-markdown-studio-desktop",
+  "version": "0.2.0",
+  "private": true,
+  "type": "module",
+  "workspaces": [
+    "apps/*",
+    "packages/*"
+  ],
+  "scripts": {
+    "dev": "npm run dev --workspace @gms/editor",
+    "build": "npm run build --workspace @gms/editor",
+    "preview": "npm run preview --workspace @gms/editor",
+    "test": "node --test packages/guitar-markdown/test/*.test.js",
+    "export:pdf": "node packages/exporter-pdf/src/cli.js",
+    "desktop:dev": "concurrently -k \"npm run dev -- --host 127.0.0.1\" \"wait-on http://127.0.0.1:5173 && cross-env GMS_DEV_SERVER_URL=http://127.0.0.1:5173 electron electron/main.cjs\"",
+    "desktop:start": "npm run build && electron electron/main.cjs",
+    "desktop:package": "npm run build && electron-forge package",
+    "desktop:make": "npm run build && electron-forge make",
+    "desktop:publish": "npm run build && electron-forge publish"
+  },
+  "engines": {
+    "node": ">=20"
+  },
+  "description": "Éditeur de cours de guitare Markdown avec rendu SVG VexFlow et SVGuitar.",
+  "main": "electron/main.cjs",
+  "author": "Exostic",
+  "license": "MIT",
+  "devDependencies": {
+    "@electron-forge/cli": "^7.8.1",
+    "@electron-forge/maker-deb": "^7.8.1",
+    "@electron-forge/maker-dmg": "^7.8.1",
+    "@electron-forge/maker-rpm": "^7.8.1",
+    "@electron-forge/maker-squirrel": "^7.8.1",
+    "@electron-forge/maker-zip": "^7.8.1",
+    "concurrently": "^9.2.0",
+    "cross-env": "^7.0.3",
+    "electron": "^37.2.6",
+    "wait-on": "^8.0.4"
+  }
+}

@@ -1,0 +1,192 @@
+import MarkdownIt from "markdown-it";
+import DOMPurify from "dompurify";
+import { parseAsciiTab, parseChordBlock, parseRhythmPattern, parseChordGrid } from "@gms/guitar-markdown";
+import logoUrl from "./assets/logo.png";
+
+let blockCounter = 0;
+let currentTimeSignature = "4/4";
+const pendingRenders = [];
+
+const META_LABELS = {
+  difficulty: "Difficulté",
+  tempo: "Tempo",
+  time: "Mesure",
+  capo: "Capo",
+  tuning: "Accordage",
+};
+
+function escapeHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+function formatChordLabel(cell) {
+  const match = cell.match(/^([A-G][#b]?)(.*)$/);
+  if (!match || !match[2] || match[2] === "m") return escapeHtml(cell);
+  return `${escapeHtml(match[1])}<sub class="chord-ext">${escapeHtml(match[2])}</sub>`;
+}
+
+function renderGridCell(cell) {
+  const splitMatch = cell.match(/^(.+)\/(.+)$/);
+  if (!splitMatch) return `<div class="grid-cell">${formatChordLabel(cell)}</div>`;
+  const [, first, second] = splitMatch;
+  return `<div class="grid-cell grid-cell-split">
+    <svg class="split-divider" viewBox="0 0 100 100" preserveAspectRatio="none"><line x1="0" y1="100" x2="100" y2="0" /></svg>
+    <span class="split-part split-first">${formatChordLabel(first.trim())}</span>
+    <span class="split-part split-second">${formatChordLabel(second.trim())}</span>
+  </div>`;
+}
+
+function parseFrontMatter(source) {
+  const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
+  if (!match) return { data: {}, content: source };
+  const data = {};
+  for (const line of match[1].split(/\r?\n/)) {
+    const separatorIndex = line.indexOf(":");
+    if (separatorIndex === -1) continue;
+    const key = line.slice(0, separatorIndex).trim();
+    const value = line.slice(separatorIndex + 1).trim();
+    if (key) data[key] = value;
+  }
+  return { data, content: source.slice(match[0].length) };
+}
+
+function renderHeader(data) {
+  const { title, artist, ...rest } = data;
+  const pills = Object.entries(rest)
+    .filter(([, value]) => value)
+    .map(([key, value]) => {
+      const label = META_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+      return `<span class="meta-pill"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)}</span>`;
+    })
+    .join("");
+  if (!title && !artist && !pills) return "";
+  return `<header class="doc-header">
+    <img class="doc-logo" src="${logoUrl}" alt="Rock'n Go" />
+    <div class="doc-title-block">
+      ${title ? `<h1 class="doc-title">${escapeHtml(title)}</h1>` : ""}
+      ${artist ? `<p class="doc-artist">${escapeHtml(artist)}</p>` : ""}
+      ${pills ? `<div class="doc-meta">${pills}</div>` : ""}
+    </div>
+  </header>`;
+}
+
+const md = new MarkdownIt({ html: false, linkify: true, typographer: true, breaks: false });
+const defaultFence = md.renderer.rules.fence.bind(md.renderer.rules);
+
+md.renderer.rules.fence = (tokens, index, options, env, self) => {
+  const token = tokens[index];
+  const language = token.info.trim().toLowerCase();
+
+  if (language === "tab") {
+    const id = `gms-tab-${blockCounter++}`;
+    try {
+      const ast = parseAsciiTab(token.content, { timeSignature: currentTimeSignature });
+      pendingRenders.push({ type: "tab", id, ast });
+      return `<figure class="guitar-block tab-block"><div id="${id}" class="vex-tab-host"></div><details><summary>Source ASCII</summary><pre><code>${escapeHtml(token.content)}</code></pre></details></figure>`;
+    } catch (error) {
+      return `<div class="block-error"><strong>Tablature invalide</strong><p>${escapeHtml(error.message)}</p><pre>${escapeHtml(token.content)}</pre></div>`;
+    }
+  }
+
+  if (language === "partition") {
+    const id = `gms-partition-${blockCounter++}`;
+    try {
+      const ast = parseAsciiTab(token.content, { timeSignature: currentTimeSignature });
+      pendingRenders.push({ type: "partition", id, ast });
+      return `<figure class="guitar-block partition-block"><div id="${id}" class="vex-score-host"></div><details><summary>Source ASCII</summary><pre><code>${escapeHtml(token.content)}</code></pre></details></figure>`;
+    } catch (error) {
+      return `<div class="block-error"><strong>Partition invalide</strong><p>${escapeHtml(error.message)}</p><pre>${escapeHtml(token.content)}</pre></div>`;
+    }
+  }
+
+  if (language === "chords") {
+    const id = `gms-chords-${blockCounter++}`;
+    try {
+      const ast = parseChordBlock(token.content);
+      pendingRenders.push({ type: "chords", id, ast });
+      return `<figure class="guitar-block chord-block"><div id="${id}" class="svguitar-host"></div></figure>`;
+    } catch (error) {
+      return `<div class="block-error"><strong>Accords invalides</strong><p>${escapeHtml(error.message)}</p></div>`;
+    }
+  }
+
+  if (language === "grid") {
+    try {
+      const grid = parseChordGrid(token.content);
+      const rowsHtml = grid.rows
+        .map((row, index) => {
+          const cellsHtml = row.cells.map(renderGridCell).join("");
+          const cls = `grid-row${row.repeat ? " repeat" : ""}`;
+          const rowLine = index + 1;
+          const rowHtml = `<div class="${cls}" style="--cols:${row.cells.length}; grid-row:${rowLine};">${cellsHtml}</div>`;
+          const countHtml = row.repeatCount
+            ? `<span class="grid-repeat-count" style="grid-row:${rowLine};">&times; ${escapeHtml(row.repeatCount)}</span>`
+            : "";
+          return rowHtml + countHtml;
+        })
+        .join("");
+      return `<div class="chord-grid">${rowsHtml}</div>`;
+    } catch (error) {
+      return `<div class="block-error"><strong>Grille invalide</strong><p>${escapeHtml(error.message)}</p></div>`;
+    }
+  }
+
+  if (language === "rhythm") {
+    try {
+      const pattern = parseRhythmPattern(token.content);
+      const groupsHtml = pattern.groups
+        .map((group, index) => {
+          const strokesHtml = group
+            .map((stroke, strokeIndex) => {
+              const label = stroke.direction === "down" ? "B" : "H";
+              const cls = `stroke stroke-${stroke.direction}${stroke.ghost ? " ghost" : ""}`;
+              const strokeHtml = `<span class="${cls}">${label}</span>`;
+              if (strokeIndex !== 0) return strokeHtml;
+              return `<span class="rhythm-first">${strokeHtml}<span class="beat-number">${index + 1}</span></span>`;
+            })
+            .join("");
+          return `<div class="rhythm-group"><div class="rhythm-strokes">${strokesHtml}</div></div>`;
+        })
+        .join("");
+      return `<div class="rhythm-block">${groupsHtml}</div>`;
+    } catch (error) {
+      return `<div class="block-error"><strong>Rythmique invalide</strong><p>${escapeHtml(error.message)}</p></div>`;
+    }
+  }
+  if (language === "song") {
+    const columns = token.content.split(/\r?\n[ \t]*-{3,}[ \t]*\r?\n/);
+    const columnsHtml = columns
+      .map(column => {
+        const versesHtml = column
+          .split(/\r?\n\s*\r?\n/)
+          .map(verse => verse.trim())
+          .filter(Boolean)
+          .map(verse => {
+            const html = escapeHtml(verse)
+              .replace(/\[([^\]]+)\]/g, (_, chord) => `<span class="inline-chord" data-chord="${chord}"></span>`)
+              .replace(/\n/g, "<br>");
+            return `<div class="song-verse">${html}</div>`;
+          })
+          .join("");
+        return `<div class="song-column">${versesHtml}</div>`;
+      })
+      .join("");
+    return `<div class="song-block" style="--song-columns:${columns.length}">${columnsHtml}</div>`;
+  }
+  if (language === "pagebreak") return `<div class="page-break"></div>`;
+  return defaultFence(tokens, index, options, env, self);
+};
+
+export function renderMarkdown(source) {
+  blockCounter = 0;
+  pendingRenders.length = 0;
+  const { data, content } = parseFrontMatter(source);
+  currentTimeSignature = data.time ?? "4/4";
+  const headerHtml = renderHeader(data);
+  const bodyHtml = md.render(content);
+  return { html: DOMPurify.sanitize(headerHtml + bodyHtml), renders: [...pendingRenders] };
+}

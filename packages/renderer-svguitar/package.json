@@ -1,0 +1,9 @@
+{
+  "name": "@gms/renderer-svguitar",
+  "version": "0.1.0",
+  "type": "module",
+  "exports": "./src/index.js",
+  "dependencies": {
+    "svguitar": "^2.5.1"
+  }
+}
