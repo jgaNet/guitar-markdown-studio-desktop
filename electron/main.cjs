@@ -93,3 +93,15 @@ ipcMain.handle('document:export-pdf', async (_event, suggestedFileName) => {
   await fs.writeFile(result.filePath, pdf);
   return { filePath: result.filePath };
 });
+
+ipcMain.handle('document:export-html', async (_event, html, suggestedFileName) => {
+  const result = await dialog.showSaveDialog(mainWindow, {
+    title: 'Exporter le cours en HTML',
+    defaultPath: suggestedFileName || 'cours-guitare.html',
+    filters: [{ name: 'HTML', extensions: ['html'] }],
+  });
+  if (result.canceled || !result.filePath) return null;
+
+  await fs.writeFile(result.filePath, html, 'utf8');
+  return { filePath: result.filePath };
+});

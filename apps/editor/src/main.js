@@ -1,8 +1,12 @@
 import "./style.css";
+import styleCssText from "./style.css?raw";
+import logoUrl from "./assets/logo.png";
 import { DEFAULT_MARKDOWN } from "./default-content.js";
 import { renderMarkdown, parseFrontMatter } from "./markdown.js";
 import { renderTablatureSvg, renderScoreSvg } from "@gms/renderer-vexflow";
 import { renderChordDiagrams } from "@gms/renderer-svguitar";
+import { Bravura } from "../../../node_modules/vexflow/build/esm/src/fonts/bravura.js";
+import { Academico } from "../../../node_modules/vexflow/build/esm/src/fonts/academico.js";
 
 const STORAGE_KEY = "gms:vexflow:document";
 const EDITOR_WIDTH_KEY = "gms:editor-width";
@@ -25,8 +29,10 @@ const app = document.querySelector("#app");
 const saved = localStorage.getItem(STORAGE_KEY) ?? DEFAULT_MARKDOWN;
 let currentFilePath = null;
 let fitToPage = false;
+let webMode = false;
 let editorWidth = Number(localStorage.getItem(EDITOR_WIDTH_KEY)) || DEFAULT_EDITOR_WIDTH;
 let compactView = "preview";
+let toolbarOpen = false;
 
 app.innerHTML = `
 <main class="app-shell">
@@ -62,16 +68,17 @@ app.innerHTML = `
   <section class="workspace">
     <button id="edit-toggle" class="edit-toggle" type="button" hidden>✎ Éditer</button>
     <section class="pane editor-pane" id="editor-pane">
-      <div class="pane-title">Markdown</div>
+      <div class="pane-title" id="editor-pane-title">Markdown</div>
       <textarea id="editor" spellcheck="false"></textarea>
     </section>
     <div class="resizer" id="pane-resizer"></div>
     <section class="pane preview-pane">
       <div class="pane-title pane-title-row">
-        <span>Preview</span>
+        <span id="preview-pane-title">Preview</span>
         <div class="mode-switch" role="group" aria-label="Mode de mise en page">
-          <button id="mode-portrait" class="mode-option" type="button">Standard</button>
-          <button id="mode-landscape" class="mode-option" type="button">Optimisé</button>
+          <button id="mode-portrait" class="mode-option" type="button">Book</button>
+          <button id="mode-landscape" class="mode-option" type="button">Poster</button>
+          <button id="mode-web" class="mode-option" type="button">Web</button>
         </div>
       </div>
       <div id="preview-scale-wrapper">
@@ -90,9 +97,14 @@ const editorPane = document.querySelector("#editor-pane");
 const resizer = document.querySelector("#pane-resizer");
 const editToggle = document.querySelector("#edit-toggle");
 const insertbar = document.querySelector(".insertbar");
+const topbar = document.querySelector(".topbar");
+const editorPaneTitle = document.querySelector("#editor-pane-title");
+const previewPaneTitle = document.querySelector("#preview-pane-title");
 const compactQuery = window.matchMedia(COMPACT_BREAKPOINT);
 const modePortraitButton = document.querySelector("#mode-portrait");
 const modeLandscapeButton = document.querySelector("#mode-landscape");
+const modeWebButton = document.querySelector("#mode-web");
+const printButton = document.querySelector("#print");
 const status = document.querySelector("#status");
 editor.value = saved;
 
@@ -109,12 +121,37 @@ const snippets = {
   zoom: `\n\`\`\`zoom 0.8\n\`\`\`\n\n\`\`\`endzoom\n\`\`\`\n`,
 };
 
+const NOTATION_MEASURE_WIDTH = 220;
+// Reference width used only for deciding how many measures fit per row (not
+// the actual rendered measure width) — tuned so the default web-mode width
+// (760px cap minus its padding, ≈704px) yields exactly 4 measures per row.
+const NOTATION_ROW_REFERENCE_WIDTH = 176;
+
+function computeMeasuresPerRow() {
+  // Based on the preview's actual rendered content width, not a viewport
+  // breakpoint — a desktop window is "wide" but the preview area itself can
+  // still be narrow (editor dragged wide, or the compact single-pane view),
+  // and notation should wrap to fit whatever room it actually has.
+  const style = getComputedStyle(preview);
+  const paddingX = parseFloat(style.paddingLeft) + parseFloat(style.paddingRight);
+  const availableWidth = preview.clientWidth - paddingX;
+  return Math.max(1, Math.floor(availableWidth / NOTATION_ROW_REFERENCE_WIDTH));
+}
+
+const PRINT_MODE_MEASURES_PER_ROW = 4;
+
 function drawPending(renders) {
+  // In web mode, notation reflows to fit the preview's actual width instead
+  // of one continuous print-oriented row — additional measures wrap onto new
+  // lines below instead of overflowing. Book and Poster modes use fixed page
+  // widths (not responsive to the window), so a plain fixed cap applies there
+  // instead of the dynamic width measurement.
+  const measuresPerRow = webMode ? computeMeasuresPerRow() : PRINT_MODE_MEASURES_PER_ROW;
   for (const render of renders) {
     const target = document.getElementById(render.id);
     if (!target) continue;
-    if (render.type === "tab") renderTablatureSvg(render.ast, target, { measureWidth: 220, height: 130 });
-    if (render.type === "partition") renderScoreSvg(render.ast, target, { measureWidth: 220, height: 110 });
+    if (render.type === "tab") renderTablatureSvg(render.ast, target, { measureWidth: NOTATION_MEASURE_WIDTH, height: 130, measuresPerRow });
+    if (render.type === "partition") renderScoreSvg(render.ast, target, { measureWidth: NOTATION_MEASURE_WIDTH, height: 110, measuresPerRow });
     if (render.type === "chords") renderChordDiagrams(render.ast, target);
   }
 }
@@ -194,8 +231,8 @@ function applyColumnSections() {
   output.forEach(node => preview.append(node));
 }
 
-function wrapZoomSections() {
-  const nodes = [...preview.childNodes];
+function wrapZoomSectionsIn(container) {
+  const nodes = [...container.childNodes];
   const output = [];
   let i = 0;
   while (i < nodes.length) {
@@ -225,8 +262,15 @@ function wrapZoomSections() {
     output.push(block);
   }
 
-  preview.innerHTML = "";
-  output.forEach(node => preview.append(node));
+  container.innerHTML = "";
+  output.forEach(node => container.append(node));
+}
+
+function wrapZoomSections() {
+  // applyColumnSections() runs first and may have moved zoom markers inside a
+  // .column-section-column, so scan those too, not just the top level.
+  wrapZoomSectionsIn(preview);
+  preview.querySelectorAll(".column-section-column").forEach(wrapZoomSectionsIn);
 }
 
 function applyZoomScale(root = document) {
@@ -370,18 +414,22 @@ function rescaleLandscapeColumns() {
   });
 }
 
+function resetPreviewVisibility() {
+  preview.classList.remove("landscape-fit");
+  preview.style.transform = "";
+  preview.style.width = "";
+  preview.style.display = "";
+  previewWrapper.style.height = "";
+  previewWrapper.innerHTML = "";
+  previewWrapper.append(preview);
+}
+
 function applyPageFit() {
   workspace.classList.toggle("landscape-active", fitToPage);
   setPrintOrientation(fitToPage);
 
   if (!fitToPage) {
-    preview.classList.remove("landscape-fit");
-    preview.style.transform = "";
-    preview.style.width = "";
-    preview.style.display = "";
-    previewWrapper.style.height = "";
-    previewWrapper.innerHTML = "";
-    previewWrapper.append(preview);
+    resetPreviewVisibility();
     return;
   }
 
@@ -394,18 +442,29 @@ function applyCompactMode() {
   if (!compactQuery.matches) {
     workspace.classList.remove("editor-overlay");
     insertbar.hidden = false;
+    topbar.hidden = false;
+    editorPaneTitle.classList.remove("expandable", "expanded");
+    previewPaneTitle.classList.remove("expandable", "expanded");
     applyEditorWidth();
     return;
   }
-  // Tablet/mobile: a single full-width pane at a time — either the editor (with
-  // its insert toolbar) or the preview (full A4/optimized rendering, no editing
-  // controls) — toggled by the same floating button used on desktop.
+  // Tablet/mobile: a single full-width pane at a time — either the editor or
+  // the preview (full A4/optimized/web rendering) — toggled by the same
+  // floating button used on desktop. The top action bar (Importer/Enregistrer/
+  // Exporter…) starts collapsed and drops down from either pane's header —
+  // from "Markdown" it comes with the insert buttons too; from "Preview" it's
+  // just the actions, with no editing controls.
   resizer.hidden = true;
   const showEditor = compactView === "edit";
   editorPane.hidden = !showEditor;
   editorPane.style.width = "100%";
   previewPane.hidden = showEditor;
-  insertbar.hidden = !showEditor;
+  topbar.hidden = !toolbarOpen;
+  insertbar.hidden = !(showEditor && toolbarOpen);
+  editorPaneTitle.classList.toggle("expandable", showEditor);
+  editorPaneTitle.classList.toggle("expanded", showEditor && toolbarOpen);
+  previewPaneTitle.classList.toggle("expandable", !showEditor);
+  previewPaneTitle.classList.toggle("expanded", !showEditor && toolbarOpen);
   editToggle.hidden = false;
   editToggle.textContent = showEditor ? "👁 Aperçu" : "✎ Éditer";
 }
@@ -435,12 +494,17 @@ function update() {
   try {
     const result = renderMarkdown(editor.value);
     preview.innerHTML = result.html;
+    preview.classList.toggle("web-mode", webMode);
     const { data } = parseFrontMatter(editor.value);
     document.title = data.title ? slugify(data.title) : "Guitar Markdown Studio";
     applyColumnSections();
     wrapZoomSections();
+    // Undo any leftover landscape hiding (preview stays display:none, detached
+    // into page boxes, while fitToPage was active) BEFORE measuring/drawing —
+    // otherwise a mode switch away from Poster reads a stale clientWidth of 0.
+    resetPreviewVisibility();
     drawPending(result.renders);
-    if (fitToPage) {
+    if (fitToPage || webMode) {
       preview.querySelectorAll(".page-break-line").forEach(line => line.remove());
     } else {
       renderPageBreaks();
@@ -448,7 +512,7 @@ function update() {
     applyPageFit();
     fitRhythmBlocks();
     fitChordGrids();
-    applyZoomScale();
+    if (!webMode) applyZoomScale();
     localStorage.setItem(STORAGE_KEY, editor.value);
     status.textContent = "Sauvegardé";
   } catch (error) {
@@ -468,6 +532,12 @@ window.addEventListener("resize", () => {
   clearTimeout(resizeDebounce);
   resizeDebounce = setTimeout(() => {
     applyCompactMode();
+    if (webMode) {
+      // Re-render from scratch so notation re-measures the preview's new
+      // width and re-wraps its measures-per-row accordingly.
+      update();
+      return;
+    }
     if (fitToPage) rescaleLandscapeColumns();
     else renderPageBreaks();
     fitRhythmBlocks();
@@ -532,6 +602,9 @@ window.addEventListener("mouseup", () => {
   resizer.classList.remove("dragging");
   document.body.style.cursor = "";
   localStorage.setItem(EDITOR_WIDTH_KEY, String(editorWidth));
+  // The preview's width just changed — re-render so notation re-wraps its
+  // measures-per-row to fit the new width.
+  if (webMode) update();
 });
 editToggle.addEventListener("click", () => {
   if (compactQuery.matches) {
@@ -546,20 +619,37 @@ editToggle.addEventListener("click", () => {
   if (!isOverlay) applyEditorWidth();
 });
 compactQuery.addEventListener("change", applyCompactMode);
-function setOrientationMode(landscape) {
-  if (fitToPage === landscape) return;
-  fitToPage = landscape;
-  modePortraitButton.classList.toggle("active", !landscape);
-  modePortraitButton.setAttribute("aria-pressed", String(!landscape));
-  modeLandscapeButton.classList.toggle("active", landscape);
-  modeLandscapeButton.setAttribute("aria-pressed", String(landscape));
+editorPaneTitle.addEventListener("click", () => {
+  if (!compactQuery.matches || compactView !== "edit") return;
+  toolbarOpen = !toolbarOpen;
+  applyCompactMode();
+});
+previewPaneTitle.addEventListener("click", () => {
+  if (!compactQuery.matches || compactView === "edit") return;
+  toolbarOpen = !toolbarOpen;
+  applyCompactMode();
+});
+function setViewMode(mode) {
+  const nextFitToPage = mode === "landscape";
+  const nextWebMode = mode === "web";
+  fitToPage = nextFitToPage;
+  webMode = nextWebMode;
+  modePortraitButton.classList.toggle("active", mode === "standard");
+  modePortraitButton.setAttribute("aria-pressed", String(mode === "standard"));
+  modeLandscapeButton.classList.toggle("active", mode === "landscape");
+  modeLandscapeButton.setAttribute("aria-pressed", String(mode === "landscape"));
+  modeWebButton.classList.toggle("active", mode === "web");
+  modeWebButton.setAttribute("aria-pressed", String(mode === "web"));
+  printButton.textContent = webMode ? "Exporter HTML" : "Imprimer / PDF";
   update();
 }
 modePortraitButton.classList.add("active");
 modePortraitButton.setAttribute("aria-pressed", "true");
 modeLandscapeButton.setAttribute("aria-pressed", "false");
-modePortraitButton.addEventListener("click", () => setOrientationMode(false));
-modeLandscapeButton.addEventListener("click", () => setOrientationMode(true));
+modeWebButton.setAttribute("aria-pressed", "false");
+modePortraitButton.addEventListener("click", () => setViewMode("standard"));
+modeLandscapeButton.addEventListener("click", () => setViewMode("landscape"));
+modeWebButton.addEventListener("click", () => setViewMode("web"));
 function slugify(title) {
   const base = (title ?? "")
     .normalize("NFD")
@@ -570,9 +660,76 @@ function slugify(title) {
     .replace(/\s+/g, "-");
   return base || "cours-guitare";
 }
-document.querySelector("#print").addEventListener("click", async () => {
+function escapeHtml(value) {
+  return value
+    .replaceAll("&", "&amp;")
+    .replaceAll("<", "&lt;")
+    .replaceAll(">", "&gt;")
+    .replaceAll('"', "&quot;");
+}
+
+async function inlineLogo(html) {
+  // The live app's logo <img> points at a dev-server/build URL that only
+  // resolves inside the running app — inline it as a data URI so the
+  // exported file renders correctly on its own, with no external assets.
+  try {
+    const response = await fetch(logoUrl);
+    const blob = await response.blob();
+    const dataUrl = await new Promise((resolve, reject) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result);
+      reader.onerror = () => reject(reader.error);
+      reader.readAsDataURL(blob);
+    });
+    return html.replaceAll(logoUrl, dataUrl);
+  } catch {
+    return html;
+  }
+}
+
+const NOTATION_FONT_FACES = `
+@font-face { font-family: "Bravura"; src: url("${Bravura}") format("woff2"); }
+@font-face { font-family: "Academico"; src: url("${Academico}") format("woff2"); }
+`;
+
+async function buildWebExportDocument(title) {
+  const html = `<!doctype html>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>${escapeHtml(title || "Cours de guitare")}</title>
+<style>${NOTATION_FONT_FACES}${styleCssText}</style>
+</head>
+<body style="background:#eef1f5; margin:0; padding:1.5rem 0.75rem;">
+<article class="course-page web-mode" style="margin:0 auto;">${preview.innerHTML}</article>
+</body>
+</html>
+`;
+  return inlineLogo(html);
+}
+
+printButton.addEventListener("click", async () => {
+  const { data } = parseFrontMatter(editor.value);
+  if (webMode) {
+    const html = await buildWebExportDocument(data.title);
+    const fileName = `${slugify(data.title)}.html`;
+    if (window.gmsDesktop) {
+      const result = await window.gmsDesktop.exportHtml(html, fileName);
+      if (result) status.textContent = "HTML exporté";
+    } else {
+      const blob = new Blob([html], { type: "text/html;charset=utf-8" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = fileName;
+      a.click();
+      URL.revokeObjectURL(url);
+      status.textContent = "HTML exporté";
+    }
+    return;
+  }
   if (window.gmsDesktop) {
-    const { data } = parseFrontMatter(editor.value);
     const result = await window.gmsDesktop.exportPdf(`${slugify(data.title)}.pdf`);
     if (result) status.textContent = "PDF exporté";
   } else {

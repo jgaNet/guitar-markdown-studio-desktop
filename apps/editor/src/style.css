@@ -46,6 +46,9 @@ button:hover,
   justify-content: space-between;
   align-items: center;
 }
+.topbar[hidden] {
+  display: none;
+}
 .topbar h1 {
   margin: 0;
   font-size: 1.25rem;
@@ -95,6 +98,10 @@ button:hover,
   display: flex;
   background: #cfd5df;
   gap: 1px;
+  /* Explicit, so hiding .topbar/.insertbar (both display:none in compact mode)
+     doesn't shift this into their now-empty auto-placed track instead of the
+     1fr row it's meant to fill. */
+  grid-row: 3;
 }
 .editor-pane {
   flex: 0 0 auto;
@@ -148,6 +155,7 @@ button:hover,
   min-width: 0;
   background: #fff;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto 1fr;
 }
 .pane-title {
@@ -156,6 +164,33 @@ button:hover,
   border-bottom: 1px solid #e5e7eb;
   font-weight: 650;
   font-size: 0.85rem;
+}
+.pane-title.expandable {
+  cursor: pointer;
+  user-select: none;
+}
+.pane-title.expandable::after {
+  content: "▾";
+  float: right;
+  color: #9992c2;
+  transition: transform 0.15s ease;
+}
+.pane-title.expandable.expanded::after {
+  transform: rotate(180deg);
+}
+#preview-pane-title.expandable {
+  cursor: pointer;
+  user-select: none;
+}
+#preview-pane-title.expandable::after {
+  content: "▾";
+  margin-left: 0.4em;
+  color: #9992c2;
+  display: inline-block;
+  transition: transform 0.15s ease;
+}
+#preview-pane-title.expandable.expanded::after {
+  transform: rotate(180deg);
 }
 .pane-title-row {
   display: flex;
@@ -166,6 +201,7 @@ button:hover,
 .preview-pane .pane-title {
   position: sticky;
   top: 0;
+  left: 0;
   z-index: 2;
   padding-top: 0.35rem;
   padding-bottom: 0.35rem;
@@ -233,6 +269,50 @@ button:hover,
   min-height: 0;
   height: 210mm;
   padding: 14mm 15mm;
+}
+.course-page.web-mode {
+  width: 100%;
+  max-width: 760px;
+  min-height: 0;
+  margin: 0 auto;
+  padding: 1.75rem;
+  border-radius: 12px;
+  box-shadow: none;
+}
+.course-page.web-mode .page-break,
+.course-page.web-mode .column-break,
+.course-page.web-mode .landscape-page-break {
+  display: none;
+}
+@media (max-width: 600px) {
+  .course-page.web-mode {
+    padding: 1.1rem;
+    border-radius: 0;
+  }
+  .course-page.web-mode .column-section {
+    grid-template-columns: 1fr !important;
+    row-gap: 1.25rem;
+  }
+  .course-page.web-mode .column-section-column {
+    border-left: none;
+    border-top: 1px solid #ececf2;
+    padding-left: 0;
+    padding-top: 1rem;
+  }
+  .course-page.web-mode .column-section-column:first-child {
+    border-top: none;
+    padding-top: 0;
+  }
+  .course-page.web-mode .song-block {
+    grid-template-columns: 1fr !important;
+  }
+  .course-page.web-mode .song-column {
+    border-left: none;
+    padding-left: 0;
+  }
+  .course-page.web-mode .doc-logo {
+    width: 120px;
+  }
 }
 .landscape-columns {
   display: flex;
@@ -673,6 +753,10 @@ details pre {
     background: #fff;
   }
   .preview-pane {
+    /* On mobile/tablet the compact single-pane toggle may leave this hidden
+       (editor shown instead) at the moment print/export is triggered from the
+       topbar — force it visible so the exported page isn't blank. */
+    display: block !important;
     overflow: visible;
   }
   #preview-scale-wrapper {

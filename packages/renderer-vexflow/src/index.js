@@ -116,7 +116,11 @@ function renderRow(container, measures, options) {
   const height = options.height;
   const { numBeats, beatValue } = parseTimeSignature(options.timeSignature);
   const clefOverhead = measureClefOverhead(() => new TabStave(0, 0, measureWidth, { spaceAboveStaffLn: 2 }));
-  const widths = computeMeasureWidths(measureWidth, measures.length, clefOverhead);
+  // Size the canvas for a full row (options.measuresPerRow), not just this
+  // row's actual measure count — otherwise a shorter last row has a smaller
+  // natural SVG width and CSS max-width scaling makes its notation look
+  // bigger than the other, fuller rows.
+  const widths = computeMeasureWidths(measureWidth, options.measuresPerRow ?? measures.length, clefOverhead);
   const totalWidth = widths.reduce((sum, width) => sum + width, 0);
 
   const renderer = new Renderer(container, Renderer.Backends.SVG);
@@ -167,7 +171,8 @@ function renderScoreRow(container, measures, options) {
   const tabHeight = options.height;
   const { numBeats, beatValue } = parseTimeSignature(options.timeSignature);
   const clefOverhead = measureScoreClefOverhead(measureWidth, numBeats, beatValue);
-  const widths = computeMeasureWidths(measureWidth, measures.length, clefOverhead);
+  // Same fixed-canvas-width reasoning as renderRow — see comment there.
+  const widths = computeMeasureWidths(measureWidth, options.measuresPerRow ?? measures.length, clefOverhead);
   const totalWidth = widths.reduce((sum, width) => sum + width, 0);
 
   const renderer = new Renderer(container, Renderer.Backends.SVG);
