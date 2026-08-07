@@ -22,8 +22,7 @@ jobs:
       - uses: actions/setup-node@v4
         with:
           node-version: 22
-          cache: npm
-      - run: npm ci
+      - run: npm install
       - run: npm run build --workspace @gms/editor
         env:
           GMS_BASE_PATH: /guitar-markdown-studio-desktop/
