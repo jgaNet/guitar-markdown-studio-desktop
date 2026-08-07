@@ -27,9 +27,14 @@ button:hover,
   color: white;
   border-color: #332466;
 }
+.primary:hover {
+  background: #241a4d;
+  color: white;
+}
 .app-shell {
   height: 100vh;
   display: grid;
+  grid-template-columns: minmax(0, 1fr);
   grid-template-rows: auto auto 1fr;
 }
 .topbar {
@@ -52,6 +57,7 @@ button:hover,
 }
 .actions {
   display: flex;
+  align-items: center;
   gap: 0.5rem;
   flex-wrap: wrap;
 }
@@ -62,6 +68,18 @@ button:hover,
   padding: 0.55rem 1rem;
   background: #fafafa;
   border-bottom: 1px solid #dfe3ea;
+  flex-wrap: wrap;
+}
+.insert-group {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.4rem;
+}
+.insert-divider {
+  width: 1px;
+  height: 1.6rem;
+  background: #dfe3ea;
+  margin: 0 0.2rem;
 }
 .grow {
   flex: 1;
@@ -69,13 +87,62 @@ button:hover,
 #status {
   color: #667085;
   font-size: 0.85rem;
+  margin-right: 0.5rem;
 }
 .workspace {
+  position: relative;
   min-height: 0;
-  display: grid;
-  grid-template-columns: minmax(320px, 1fr) minmax(420px, 1fr);
-  gap: 1px;
+  display: flex;
   background: #cfd5df;
+  gap: 1px;
+}
+.editor-pane {
+  flex: 0 0 auto;
+  min-width: 0;
+  overflow: hidden;
+}
+.editor-pane[hidden] {
+  display: none;
+}
+.resizer {
+  flex: 0 0 6px;
+  cursor: col-resize;
+  background: #cfd5df;
+}
+.resizer:hover,
+.resizer.dragging {
+  background: #332466;
+}
+.resizer[hidden] {
+  display: none;
+}
+.preview-pane[hidden] {
+  display: none;
+}
+.insertbar[hidden] {
+  display: none;
+}
+.edit-toggle {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  background: #332466;
+  color: #fff;
+  border-color: #332466;
+  box-shadow: 0 4px 14px rgb(31 41 55 / 25%);
+}
+.edit-toggle:hover {
+  background: #241a4d;
+}
+.edit-toggle[hidden] {
+  display: none;
+}
+.workspace.editor-overlay .editor-pane {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  width: auto !important;
 }
 .pane {
   min-width: 0;
@@ -89,6 +156,19 @@ button:hover,
   border-bottom: 1px solid #e5e7eb;
   font-weight: 650;
   font-size: 0.85rem;
+}
+.pane-title-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+.preview-pane .pane-title {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding-top: 0.35rem;
+  padding-bottom: 0.35rem;
 }
 #editor {
   width: 100%;
@@ -104,18 +184,77 @@ button:hover,
   color: #172033;
 }
 .preview-pane {
+  flex: 1 1 auto;
+  min-width: 0;
   background: #dde1e8;
   overflow: auto;
 }
+#preview-scale-wrapper {
+  overflow: visible;
+  align-self: start;
+}
+.mode-switch {
+  display: inline-flex;
+  margin: 0.15rem 0;
+  border: 1px solid #cfd5df;
+  border-radius: 8px;
+  overflow: hidden;
+}
+.mode-option {
+  border: 0;
+  border-radius: 0;
+  background: #fff;
+  padding: 0.05rem 0.5rem;
+  font-size: 0.72rem;
+  line-height: 1.1;
+}
+.mode-option:not(:first-child) {
+  border-left: 1px solid #cfd5df;
+}
+.mode-option.active {
+  background: #332466;
+  color: #fff;
+}
+.mode-option.active:hover {
+  background: #332466;
+}
 .course-page {
   position: relative;
-  width: min(210mm, calc(100% - 2rem));
+  width: 210mm;
   min-height: 297mm;
   margin: 1rem auto 3rem;
   background: #fff;
   padding: 16mm 18mm;
   box-shadow: 0 8px 28px rgb(31 41 55 / 14%);
   align-self: start;
+}
+.course-page.landscape-fit {
+  width: 297mm;
+  min-height: 0;
+  height: 210mm;
+  padding: 14mm 15mm;
+}
+.landscape-columns {
+  display: flex;
+  gap: 1rem;
+  width: 100%;
+  height: 100%;
+}
+.landscape-column {
+  flex: 1;
+  min-width: 0;
+  height: 100%;
+  overflow: hidden;
+  position: relative;
+  border-left: 1px solid #ececf2;
+  padding-left: 1rem;
+}
+.landscape-column:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+.landscape-column-inner {
+  transform-origin: top left;
 }
 .page-break {
   position: relative;
@@ -134,6 +273,54 @@ button:hover,
   font-size: 0.72rem;
   font-weight: 650;
   color: #8066c2;
+}
+.column-break {
+  display: none;
+}
+.landscape-page-break {
+  position: relative;
+  height: 0;
+  margin: 1.6rem 0;
+  border-top: 2px dashed #2f9e6e;
+}
+.landscape-page-break::after {
+  content: "Saut de page (paysage)";
+  position: absolute;
+  top: -0.75em;
+  left: 50%;
+  transform: translateX(-50%);
+  background: #fff;
+  padding: 0 0.5em;
+  font-size: 0.72rem;
+  font-weight: 650;
+  color: #2f9e6e;
+}
+/* pagebreak is portrait-only, landscapebreak/columnbreak are landscape-only:
+   whichever doesn't apply to the current mode is hidden instead of consumed. */
+.course-page.landscape-fit .page-break {
+  display: none;
+}
+.column-section {
+  display: grid;
+  grid-template-columns: repeat(var(--columns, 2), 1fr);
+  column-gap: 1.6rem;
+  align-items: start;
+  margin: 1rem 0;
+}
+.column-section-column {
+  min-width: 0;
+  border-left: 1px solid #ececf2;
+  padding-left: 1.3rem;
+}
+.column-section-column:first-child {
+  border-left: none;
+  padding-left: 0;
+}
+.zoom-block {
+  overflow: hidden;
+}
+.zoom-inner {
+  transform-origin: top left;
 }
 .page-break-line {
   position: absolute;
@@ -241,27 +428,28 @@ button:hover,
 }
 .svguitar-grid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(118px, 1fr));
-  gap: 1rem;
+  grid-template-columns: repeat(auto-fit, minmax(calc(118px * var(--zoom-scale, 1)), 1fr));
+  gap: calc(1rem * var(--zoom-scale, 1));
 }
 .svguitar-item {
-  min-height: 190px;
+  min-height: calc(190px * var(--zoom-scale, 1));
   display: grid;
   place-items: center;
   border: 1px solid #ececf2;
   border-radius: 12px;
-  padding: 0.35rem;
+  padding: calc(0.35rem * var(--zoom-scale, 1));
   break-inside: avoid;
 }
 .svguitar-item svg {
-  max-width: 145px;
+  max-width: calc(145px * var(--zoom-scale, 1));
   height: auto;
 }
 .chord-grid {
+  --grid-scale: 1;
   display: grid;
   grid-template-columns: minmax(0, 1fr) auto;
   align-items: center;
-  column-gap: 0.7rem;
+  column-gap: calc(0.7rem * var(--grid-scale));
   break-inside: avoid;
 }
 .grid-row {
@@ -286,13 +474,14 @@ button:hover,
   border-right: 7px double #332466;
 }
 .grid-cell {
-  padding: 0.85rem 0.4rem;
+  padding: calc(0.85rem * var(--grid-scale)) calc(0.4rem * var(--grid-scale));
   text-align: center;
-  font-size: 1.6rem;
+  font-size: calc(1.6rem * var(--grid-scale));
   font-weight: 800;
   color: #332466;
   background: #fff;
   border-left: 1px solid #e4d9ff;
+  overflow: hidden;
 }
 .grid-cell:first-child {
   border-left: none;
@@ -322,12 +511,12 @@ button:hover,
 .split-first {
   top: 0.3rem;
   left: 0.4rem;
-  font-size: 1rem;
+  font-size: calc(1rem * var(--grid-scale));
 }
 .split-second {
   bottom: 0.3rem;
   right: 0.4rem;
-  font-size: 1.6rem;
+  font-size: calc(1.6rem * var(--grid-scale));
 }
 .chord-ext {
   font-size: 0.6em;
@@ -337,20 +526,22 @@ button:hover,
 }
 .grid-repeat-count {
   grid-column: 2;
-  font-size: 1.35rem;
+  font-size: calc(1.35rem * var(--grid-scale));
   font-weight: 800;
   color: #6b7280;
   white-space: nowrap;
 }
 .rhythm-block {
+  --rhythm-scale: 1;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 1.6rem;
-  padding: 1.4rem 1rem;
+  gap: calc(1.6rem * var(--rhythm-scale));
+  padding: calc(1.4rem * var(--rhythm-scale)) calc(1rem * var(--rhythm-scale));
   background: #f7f7fb;
   border-radius: 9px;
   break-inside: avoid;
+  overflow: hidden;
 }
 .rhythm-group {
   display: flex;
@@ -358,7 +549,7 @@ button:hover,
 .rhythm-strokes {
   display: flex;
   align-items: flex-start;
-  gap: 0.35rem;
+  gap: calc(0.35rem * var(--rhythm-scale));
 }
 .rhythm-first {
   display: flex;
@@ -368,7 +559,7 @@ button:hover,
 }
 .stroke {
   font-family: Georgia, "Times New Roman", serif;
-  font-size: 1.7rem;
+  font-size: calc(1.7rem * var(--rhythm-scale));
   font-weight: 800;
   line-height: 1;
   color: #1f2937;
@@ -378,20 +569,26 @@ button:hover,
   font-weight: 650;
 }
 .beat-number {
-  font-size: 0.95rem;
+  font-size: calc(0.95rem * var(--rhythm-scale));
   font-weight: 650;
   color: #9992c2;
 }
 .song-block {
   display: grid;
   grid-template-columns: repeat(var(--song-columns, 1), 1fr);
-  column-gap: 2rem;
-  white-space: pre-wrap;
-  line-height: 2.1;
+  column-gap: 1.1rem;
+  background: #f9f8fd;
+  border: 1px solid #ece7fa;
+  border-radius: 12px;
+  padding: 0.85rem 0.9rem;
+  line-height: 2.05;
+  font-size: 0.94rem;
+  font-family: Georgia, "Times New Roman", serif;
 }
 .song-column {
-  border-left: 1px solid #e5e7eb;
-  padding-left: 2rem;
+  border-left: 1px solid #e0d9f5;
+  padding-left: 1rem;
+  min-width: 0;
 }
 .song-column:first-child {
   border-left: none;
@@ -399,7 +596,12 @@ button:hover,
 }
 .song-verse {
   break-inside: avoid;
-  margin-bottom: 1.3rem;
+  padding: 0.35em 0 0 0.9rem;
+  margin-bottom: 1rem;
+  border-left: 3px solid #d8c8ff;
+}
+.song-verse:last-child {
+  margin-bottom: 0;
 }
 .inline-chord {
   position: relative;
@@ -415,9 +617,15 @@ button:hover,
   left: 0;
   bottom: 100%;
   white-space: nowrap;
+  font-family: Inter, ui-sans-serif, system-ui, sans-serif;
   color: #5d3bb0;
+  background: #efe9fc;
+  border-radius: 4px;
+  padding: 0.05em 0.35em;
+  margin-left: -0.35em;
   font-weight: 750;
-  font-size: 0.75em;
+  font-size: 0.68em;
+  letter-spacing: 0.01em;
 }
 .block-error,
 .render-error {
@@ -437,18 +645,9 @@ details pre {
   overflow: auto;
 }
 @media (max-width: 900px) {
-  .workspace {
-    grid-template-columns: 1fr;
-    grid-template-rows: 48vh 1fr;
-  }
   .topbar {
     align-items: flex-start;
     flex-direction: column;
-  }
-  .course-page {
-    width: calc(100% - 1rem);
-    margin: 0.5rem;
-    padding: 1.2rem;
   }
   .doc-logo {
     width: 120px;
@@ -462,7 +661,8 @@ details pre {
   .topbar,
   .insertbar,
   .editor-pane,
-  .pane-title {
+  .pane-title,
+  .edit-toggle {
     display: none !important;
   }
   .app-shell,
@@ -475,12 +675,30 @@ details pre {
   .preview-pane {
     overflow: visible;
   }
+  #preview-scale-wrapper {
+    height: auto !important;
+    overflow: visible;
+  }
   .course-page {
     width: auto;
     min-height: 0;
     margin: 0;
     padding: 0;
     box-shadow: none;
+  }
+  .course-page:not(.landscape-fit) {
+    transform: none !important;
+  }
+  .course-page.landscape-fit {
+    width: 297mm;
+    height: 210mm;
+    padding: 14mm 15mm;
+  }
+  .course-page.landscape-fit + .course-page.landscape-fit {
+    break-before: page;
+  }
+  .landscape-page-break {
+    display: none;
   }
   .vex-tab-row {
     overflow: visible;

@@ -12,11 +12,17 @@ tuning: Standard
 
 ## Accords
 
+\`\`\`zoom 0.7
+\`\`\`
+
 \`\`\`chords
 Em 022000
 C  x32010
 G  320003
 D  xx0232
+\`\`\`
+
+\`\`\`endzoom
 \`\`\`
 
 ## Arpège principal
@@ -32,6 +38,14 @@ D|--------------|2-------------|0-------------|0-------------|
 A|2-------------|3-------------|2-------------|--------------|
 E|0-------------|--------------|3-------------|--------------|
 \`\`\`
+
+\`\`\`columnbreak
+\`\`\`
+
+
+\`\`\`pagebreak
+\`\`\`
+
 
 ## Partition
 
@@ -69,6 +83,39 @@ B H | B h | B H | h B
 \`\`\`grid
 ||: Em | C | G | D :|| x2
 Em | C | G | D
+\`\`\`
+
+\`\`\`columnbreak
+\`\`\`
+
+
+\`\`\`pagebreak
+\`\`\`
+
+
+## Deux façons de jouer
+
+Le bloc \`columns\` ... \`column\` ... \`endcolumns\` met en page n'importe quel contenu (titres, grilles, tablatures, texte...) en colonnes côte à côte, pour comparer par exemple deux versions d'une même progression.
+
+\`\`\`columns
+\`\`\`
+
+### Version simple
+
+\`\`\`grid
+| Em | C | G | D |
+\`\`\`
+
+\`\`\`column
+\`\`\`
+
+### Version enrichie
+
+\`\`\`grid
+| Em7 | Cadd9 | G | Dsus4 |
+\`\`\`
+
+\`\`\`endcolumns
 \`\`\`
 
 ## Paroles

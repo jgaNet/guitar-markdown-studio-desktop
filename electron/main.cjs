@@ -76,10 +76,10 @@ ipcMain.handle('document:save', async (_event, { content, filePath }) => {
   return { filePath: target };
 });
 
-ipcMain.handle('document:export-pdf', async () => {
+ipcMain.handle('document:export-pdf', async (_event, suggestedFileName) => {
   const result = await dialog.showSaveDialog(mainWindow, {
     title: 'Exporter le cours en PDF',
-    defaultPath: 'cours-guitare.pdf',
+    defaultPath: suggestedFileName || 'cours-guitare.pdf',
     filters: [{ name: 'PDF', extensions: ['pdf'] }],
   });
   if (result.canceled || !result.filePath) return null;

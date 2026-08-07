@@ -40,7 +40,7 @@ function renderGridCell(cell) {
   </div>`;
 }
 
-function parseFrontMatter(source) {
+export function parseFrontMatter(source) {
   const match = source.match(/^---\r?\n([\s\S]*?)\r?\n---\r?\n?/);
   if (!match) return { data: {}, content: source };
   const data = {};
@@ -166,10 +166,17 @@ md.renderer.rules.fence = (tokens, index, options, env, self) => {
           .map(verse => verse.trim())
           .filter(Boolean)
           .map(verse => {
-            const html = escapeHtml(verse)
-              .replace(/\[([^\]]+)\]/g, (_, chord) => `<span class="inline-chord" data-chord="${chord}"></span>`)
-              .replace(/\n/g, "<br>");
-            return `<div class="song-verse">${html}</div>`;
+            const linesHtml = verse
+              .split(/\r?\n/)
+              .map(line => {
+                const html = escapeHtml(line).replace(
+                  /\[([^\]]+)\]/g,
+                  (_, chord) => `<span class="inline-chord" data-chord="${chord}"></span>`,
+                );
+                return `<div class="song-line">${html}</div>`;
+              })
+              .join("");
+            return `<div class="song-verse">${linesHtml}</div>`;
           })
           .join("");
         return `<div class="song-column">${versesHtml}</div>`;
@@ -178,6 +185,18 @@ md.renderer.rules.fence = (tokens, index, options, env, self) => {
     return `<div class="song-block" style="--song-columns:${columns.length}">${columnsHtml}</div>`;
   }
   if (language === "pagebreak") return `<div class="page-break"></div>`;
+  if (language === "columnbreak") return `<div class="column-break"></div>`;
+  if (language === "landscapebreak") return `<div class="landscape-page-break"></div>`;
+  if (language === "columns") return `<div class="column-section-start"></div>`;
+  if (language === "column") return `<div class="column-section-sep"></div>`;
+  if (language === "endcolumns") return `<div class="column-section-end"></div>`;
+  const zoomMatch = language.match(/^zoom(?:\s+([\d.]+))?$/);
+  if (zoomMatch) {
+    const factor = zoomMatch[1] ? Number(zoomMatch[1]) : 0.8;
+    const scale = Math.min(3, Math.max(0.1, factor));
+    return `<div class="zoom-start" data-scale="${scale}"></div>`;
+  }
+  if (language === "endzoom") return `<div class="zoom-end"></div>`;
   return defaultFence(tokens, index, options, env, self);
 };
 

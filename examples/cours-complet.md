@@ -12,18 +12,24 @@ tuning: Standard
 
 ## Accords
 
-\`\`\`chords
+```zoom 0.7
+```
+
+```chords
 Em 022000
 C  x32010
 G  320003
 D  xx0232
-\`\`\`
+```
+
+```endzoom
+```
 
 ## Arpège principal
 
 Écris la tablature en ASCII. Le rendu de droite est généré en SVG par VexFlow.
 
-\`\`\`tab
+```tab
     Em              C               G               D
 e|------0-------|------0-------|------3-------|------2-------|
 B|----0---0-----|----1---1-----|----0---0-----|----3---3-----|
@@ -31,13 +37,21 @@ G|--0-------0---|--0-------0---|--0-------0---|--2-------2---|
 D|--------------|2-------------|0-------------|0-------------|
 A|2-------------|3-------------|2-------------|--------------|
 E|0-------------|--------------|3-------------|--------------|
-\`\`\`
+```
+
+```columnbreak
+```
+
+
+```pagebreak
+```
+
 
 ## Partition
 
 Le même arpège, avec la portée de notation classique au-dessus de la tablature.
 
-\`\`\`partition
+```partition
     Em              C               G               D
 e|------0-------|------0-------|------3-------|------2-------|
 B|----0---0-----|----1---1-----|----0---0-----|----3---3-----|
@@ -45,37 +59,70 @@ G|--0-------0---|--0-------0---|--0-------0---|--2-------2---|
 D|--------------|2-------------|0-------------|0-------------|
 A|2-------------|3-------------|2-------------|--------------|
 E|0-------------|--------------|3-------------|--------------|
-\`\`\`
+```
 
 ## Techniques
 
-\`\`\`tab
-e|--5h7--7p5------|--5/7--7\\5~-----|
+```tab
+e|--5h7--7p5------|--5/7--7\5~-----|
 B|-----------8b10-|------------------|
 G|----------------|------------------|
 D|----------------|------------------|
 A|----------------|------------------|
 E|----------------|------------------|
-\`\`\`
+```
 
 ## Rythmique
 
-\`\`\`rhythm
+```rhythm
 B H | B h | B H | h B
-\`\`\`
+```
 
 ## Grille
 
-\`\`\`grid
+```grid
 ||: Em | C | G | D :|| x2
 Em | C | G | D
-\`\`\`
+```
+
+```columnbreak
+```
+
+
+```pagebreak
+```
+
+
+## Deux façons de jouer
+
+Le bloc `columns` ... `column` ... `endcolumns` met en page n'importe quel contenu (titres, grilles, tablatures, texte...) en colonnes côte à côte, pour comparer par exemple deux versions d'une même progression.
+
+```columns
+```
+
+### Version simple
+
+```grid
+| Em | C | G | D |
+```
+
+```column
+```
+
+### Version enrichie
+
+```grid
+| Em7 | Cadd9 | G | Dsus4 |
+```
+
+```endcolumns
+```
 
 ## Paroles
 
-Une fois les accords en place, essaie de les jouer en rythme sous ce petit couplet (paroles originales, écrites pour cet exercice). Une ligne de \`---\` seule dans le bloc démarre une nouvelle colonne (tu peux en ajouter autant que tu veux) :
+Une fois les accords en place, essaie de les jouer en rythme sous ce petit couplet (paroles originales, écrites pour cet exercice). Une ligne de `---` seule dans le bloc démarre une nouvelle colonne (tu peux en ajouter autant que tu veux) :
 
-\`\`\`song
+```song
 [Em]Sur la route on chante une [C]mélodie légère,
 Les [G]cordes vibrent au rythme de nos [D]pas,
 [Em]Chaque accord est une [C]nouvelle lumière,
@@ -90,7 +137,7 @@ On [D]apprend les accords, on [Em]trace le chemin.
 
 [Em]Sur la route on chante une [C]dernière fois,
 Le [G]voyage s'achève, mais la musique [D]reste en [Em]nous.
-\`\`\`
+```
 
 ## Exercice
 
