@@ -126,6 +126,9 @@ button:hover,
 .preview-pane[hidden] {
   display: none;
 }
+.pane-title[hidden] {
+  display: none;
+}
 .insertbar[hidden] {
   display: none;
 }
@@ -143,6 +146,31 @@ button:hover,
   background: #241a4d;
 }
 .edit-toggle[hidden] {
+  display: none;
+}
+.view-only-toolbar {
+  position: absolute;
+  bottom: 0.75rem;
+  right: 0.75rem;
+  z-index: 20;
+  display: flex;
+  flex-direction: column;
+  align-items: flex-end;
+  gap: 0.4rem;
+}
+.view-only-toolbar[hidden] {
+  display: none;
+}
+.view-only-toolbar button {
+  background: #332466;
+  color: #fff;
+  border-color: #332466;
+  box-shadow: 0 4px 14px rgb(31 41 55 / 25%);
+}
+.view-only-toolbar button:hover {
+  background: #241a4d;
+}
+.view-only-toolbar button[hidden] {
   display: none;
 }
 .workspace.editor-overlay .editor-pane {
@@ -742,7 +770,8 @@ details pre {
   .insertbar,
   .editor-pane,
   .pane-title,
-  .edit-toggle {
+  .edit-toggle,
+  .view-only-toolbar {
     display: none !important;
   }
   .app-shell,

@@ -30,6 +30,9 @@ const saved = localStorage.getItem(STORAGE_KEY) ?? DEFAULT_MARKDOWN;
 let currentFilePath = null;
 let fitToPage = false;
 let webMode = false;
+let viewOnly = false;
+let hideEditButton = false;
+let hidePrintButtons = false;
 let editorWidth = Number(localStorage.getItem(EDITOR_WIDTH_KEY)) || DEFAULT_EDITOR_WIDTH;
 let compactView = "preview";
 let toolbarOpen = false;
@@ -44,6 +47,7 @@ app.innerHTML = `
       <label class="button browser-import">Importer<input id="import-file" type="file" accept=".md,.markdown" hidden></label>
       <button id="download-md">Enregistrer .md</button>
       <button id="reset">Exemple</button>
+      <button id="view-only-btn" type="button">Aperçu client</button>
       <button id="print" class="primary">Imprimer / PDF</button>
     </div>
   </header>
@@ -67,6 +71,12 @@ app.innerHTML = `
   </nav>
   <section class="workspace">
     <button id="edit-toggle" class="edit-toggle" type="button" hidden>✎ Éditer</button>
+    <div class="view-only-toolbar" id="view-only-toolbar" hidden>
+      <button id="vo-exit-edit" type="button">✎ Éditer</button>
+      <button id="vo-print" type="button" hidden>Imprimer / PDF</button>
+      <button id="vo-print-book" type="button" hidden>Imprimer (Livret)</button>
+      <button id="vo-print-poster" type="button" hidden>Imprimer (Poster)</button>
+    </div>
     <section class="pane editor-pane" id="editor-pane">
       <div class="pane-title" id="editor-pane-title">Markdown</div>
       <textarea id="editor" spellcheck="false"></textarea>
@@ -100,6 +110,13 @@ const insertbar = document.querySelector(".insertbar");
 const topbar = document.querySelector(".topbar");
 const editorPaneTitle = document.querySelector("#editor-pane-title");
 const previewPaneTitle = document.querySelector("#preview-pane-title");
+const previewPaneHeader = previewPaneTitle.closest(".pane-title");
+const viewOnlyButton = document.querySelector("#view-only-btn");
+const viewOnlyToolbar = document.querySelector("#view-only-toolbar");
+const voExitEditButton = document.querySelector("#vo-exit-edit");
+const voPrintButton = document.querySelector("#vo-print");
+const voPrintBookButton = document.querySelector("#vo-print-book");
+const voPrintPosterButton = document.querySelector("#vo-print-poster");
 const compactQuery = window.matchMedia(COMPACT_BREAKPOINT);
 const modePortraitButton = document.querySelector("#mode-portrait");
 const modeLandscapeButton = document.querySelector("#mode-landscape");
@@ -419,9 +436,31 @@ function resetPreviewVisibility() {
   preview.style.transform = "";
   preview.style.width = "";
   preview.style.display = "";
+  previewWrapper.style.width = "";
   previewWrapper.style.height = "";
   previewWrapper.innerHTML = "";
   previewWrapper.append(preview);
+}
+
+function fitBookPageToWidth() {
+  // Book mode is deliberately not responsive — the A4 page never reflows —
+  // but when the available width is narrower than the page (a narrow
+  // preview pane, or a phone in view-only mode), scale the whole page down
+  // visually instead of forcing horizontal scrolling.
+  preview.style.transform = "";
+  preview.style.width = "";
+  previewWrapper.style.width = "";
+  previewWrapper.style.height = "";
+  if (fitToPage || webMode) return;
+  const naturalWidth = preview.offsetWidth;
+  const naturalHeight = preview.offsetHeight;
+  const availableWidth = previewPane.clientWidth;
+  if (availableWidth >= naturalWidth) return;
+  const scale = Math.max(PAGE_FIT_MIN_SCALE, Math.min(1, availableWidth / naturalWidth));
+  preview.style.transformOrigin = "top left";
+  preview.style.transform = `scale(${scale})`;
+  previewWrapper.style.width = `${naturalWidth * scale}px`;
+  previewWrapper.style.height = `${naturalHeight * scale}px`;
 }
 
 function applyPageFit() {
@@ -438,6 +477,29 @@ function applyPageFit() {
 }
 
 function applyCompactMode() {
+  if (viewOnly) {
+    // Read-only sharing link (?view=only): show nothing but the rendered
+    // preview, full width, no headers or edit affordances — regardless of
+    // viewport size, so it overrides the compact/desktop split below. A
+    // small floating toolbar (exit + book/poster print) replaces every
+    // hidden control, since the topbar's own print button is unreachable.
+    workspace.classList.remove("compact", "editor-overlay");
+    topbar.hidden = true;
+    insertbar.hidden = true;
+    editorPane.hidden = true;
+    resizer.hidden = true;
+    editToggle.hidden = true;
+    editorPaneTitle.hidden = true;
+    previewPaneHeader.hidden = true;
+    previewPane.hidden = false;
+    viewOnlyToolbar.hidden = false;
+    voExitEditButton.hidden = hideEditButton;
+    updatePrintModeButtons();
+    return;
+  }
+  viewOnlyToolbar.hidden = true;
+  editorPaneTitle.hidden = false;
+  previewPaneHeader.hidden = false;
   workspace.classList.toggle("compact", compactQuery.matches);
   if (!compactQuery.matches) {
     workspace.classList.remove("editor-overlay");
@@ -513,6 +575,7 @@ function update() {
     fitRhythmBlocks();
     fitChordGrids();
     if (!webMode) applyZoomScale();
+    fitBookPageToWidth();
     localStorage.setItem(STORAGE_KEY, editor.value);
     status.textContent = "Sauvegardé";
   } catch (error) {
@@ -543,6 +606,7 @@ window.addEventListener("resize", () => {
     fitRhythmBlocks();
     fitChordGrids();
     applyZoomScale();
+    fitBookPageToWidth();
   }, 140);
 });
 editor.addEventListener("keydown", event => {
@@ -603,8 +667,9 @@ window.addEventListener("mouseup", () => {
   document.body.style.cursor = "";
   localStorage.setItem(EDITOR_WIDTH_KEY, String(editorWidth));
   // The preview's width just changed — re-render so notation re-wraps its
-  // measures-per-row to fit the new width.
+  // measures-per-row to fit the new width, or re-scale the Book page to fit.
   if (webMode) update();
+  else fitBookPageToWidth();
 });
 editToggle.addEventListener("click", () => {
   if (compactQuery.matches) {
@@ -629,6 +694,17 @@ previewPaneTitle.addEventListener("click", () => {
   toolbarOpen = !toolbarOpen;
   applyCompactMode();
 });
+function updatePrintModeButtons() {
+  // The view-only toolbar has no other way to print at all, since the
+  // topbar (and its print button) is hidden entirely. In Book/Poster mode
+  // the current layout is already print-ready, so one plain print button
+  // covers it; in Web mode printing the flowing layout as-is doesn't make
+  // sense, so it gets direct Book/Poster PDF shortcuts instead.
+  voPrintButton.hidden = webMode || hidePrintButtons;
+  voPrintBookButton.hidden = !webMode || hidePrintButtons;
+  voPrintPosterButton.hidden = !webMode || hidePrintButtons;
+}
+
 function setViewMode(mode) {
   const nextFitToPage = mode === "landscape";
   const nextWebMode = mode === "web";
@@ -641,10 +717,64 @@ function setViewMode(mode) {
   modeWebButton.classList.toggle("active", mode === "web");
   modeWebButton.setAttribute("aria-pressed", String(mode === "web"));
   printButton.textContent = webMode ? "Exporter HTML" : "Imprimer / PDF";
+  updatePrintModeButtons();
   update();
 }
-modePortraitButton.classList.add("active");
-modePortraitButton.setAttribute("aria-pressed", "true");
+
+async function printAsMode(targetMode) {
+  const previousFitToPage = fitToPage;
+  const previousWebMode = webMode;
+  fitToPage = targetMode === "landscape";
+  webMode = false;
+  update();
+  const { data } = parseFrontMatter(editor.value);
+  if (window.gmsDesktop) {
+    const result = await window.gmsDesktop.exportPdf(`${slugify(data.title)}.pdf`);
+    if (result) status.textContent = "PDF exporté";
+  } else {
+    window.print();
+  }
+  fitToPage = previousFitToPage;
+  webMode = previousWebMode;
+  update();
+}
+
+async function printCurrent() {
+  const { data } = parseFrontMatter(editor.value);
+  if (window.gmsDesktop) {
+    const result = await window.gmsDesktop.exportPdf(`${slugify(data.title)}.pdf`);
+    if (result) status.textContent = "PDF exporté";
+  } else {
+    window.print();
+  }
+}
+
+function currentModeToken() {
+  if (webMode) return "web";
+  if (fitToPage) return "poster";
+  return "book";
+}
+
+viewOnlyButton.addEventListener("click", () => {
+  viewOnly = true;
+  applyCompactMode();
+  const params = new URLSearchParams(window.location.search);
+  params.set("view", "only");
+  params.set("mode", currentModeToken());
+  history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+});
+voExitEditButton.addEventListener("click", () => {
+  viewOnly = false;
+  applyCompactMode();
+  const params = new URLSearchParams(window.location.search);
+  params.delete("view");
+  const query = params.toString();
+  history.replaceState(null, "", `${window.location.pathname}${query ? `?${query}` : ""}`);
+});
+voPrintButton.addEventListener("click", () => printCurrent());
+voPrintBookButton.addEventListener("click", () => printAsMode("standard"));
+voPrintPosterButton.addEventListener("click", () => printAsMode("landscape"));
+modePortraitButton.setAttribute("aria-pressed", "false");
 modeLandscapeButton.setAttribute("aria-pressed", "false");
 modeWebButton.setAttribute("aria-pressed", "false");
 modePortraitButton.addEventListener("click", () => setViewMode("standard"));
@@ -777,5 +907,28 @@ document.querySelector("#import-file")?.addEventListener("change", async event =
   update();
 });
 
-applyCompactMode();
-update();
+const VIEW_MODE_PARAM = { book: "standard", poster: "landscape", web: "web" };
+
+async function loadFromQueryParams() {
+  const params = new URLSearchParams(window.location.search);
+  const src = params.get("src");
+  const requestedMode = VIEW_MODE_PARAM[params.get("mode")] ?? "web";
+  viewOnly = params.get("view") === "only";
+  hideEditButton = params.get("edit") === "hide";
+  hidePrintButtons = params.get("print") === "hide";
+  applyCompactMode();
+  if (src) {
+    try {
+      status.textContent = "Chargement…";
+      const response = await fetch(src);
+      if (!response.ok) throw new Error(`HTTP ${response.status}`);
+      editor.value = await response.text();
+    } catch (error) {
+      status.textContent = "Erreur de chargement";
+      console.error("Impossible de charger le document distant :", error);
+    }
+  }
+  setViewMode(requestedMode);
+}
+
+loadFromQueryParams();
