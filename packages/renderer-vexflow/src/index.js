@@ -19,6 +19,43 @@ import {
 const SVG_NS = "http://www.w3.org/2000/svg";
 const STANDARD_TUNING = new Tuning("standard");
 
+// The row's canvas height is sized generously upfront to leave room for the
+// tallest possible content (e.g. hammer-on/pull-off connector curves arcing
+// above the stave) — for a plain row with none of that, most of that height
+// goes unused, showing up as an oversized gap before the next row. Shrink
+// the canvas down to what was actually drawn (never grow it, and only ever
+// shrink — a missed edge case here should waste space, not clip content).
+function shrinkSvgToContent(container, verticalPadding = 6) {
+  const svg = container.querySelector("svg");
+  if (!svg) return;
+  let maxBottom = 0;
+  for (const el of svg.querySelectorAll("*")) {
+    if (typeof el.getBBox !== "function") continue;
+    // The clef glyph (e.g. "TAB") is drawn from a music font whose declared
+    // em-box is much taller than the glyph actually looks — getBBox reports
+    // that full font metric, not the visible shape, which would otherwise
+    // make every row look like it needs far more height than it really does.
+    if (el.closest(".vf-clef")) continue;
+    let bbox;
+    try {
+      bbox = el.getBBox();
+    } catch {
+      continue;
+    }
+    if (bbox.width === 0 && bbox.height === 0) continue;
+    maxBottom = Math.max(maxBottom, bbox.y + bbox.height);
+  }
+  if (maxBottom <= 0) return;
+  const currentHeight = Number(svg.getAttribute("height"));
+  const tightHeight = Math.min(currentHeight, Math.ceil(maxBottom + verticalPadding));
+  if (tightHeight >= currentHeight) return;
+  svg.setAttribute("height", String(tightHeight));
+  const viewBox = svg.getAttribute("viewBox");
+  if (!viewBox) return;
+  const [x, y, width] = viewBox.split(/\s+/).map(Number);
+  svg.setAttribute("viewBox", `${x} ${y} ${width} ${tightHeight}`);
+}
+
 function parseTimeSignature(timeSignature) {
   const match = /^(\d+)\s*\/\s*(\d+)$/.exec(timeSignature ?? "4/4");
   if (!match) return { numBeats: 4, beatValue: 4 };
@@ -151,6 +188,7 @@ function renderRow(container, measures, options) {
       connector?.setContext(context).draw();
     }
   });
+  shrinkSvgToContent(container);
 }
 
 function measureScoreClefOverhead(measureWidth, numBeats, beatValue) {
@@ -230,6 +268,7 @@ function renderScoreRow(container, measures, options) {
   if (firstNotationStave && firstTabStave) {
     new StaveConnector(firstNotationStave, firstTabStave).setType("singleLeft").setContext(context).draw();
   }
+  shrinkSvgToContent(container);
 }
 
 function renderMeasureRows(ast, target, options, className, drawRow) {

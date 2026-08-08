@@ -435,10 +435,17 @@ button:hover,
   }
   .course-page.web-mode .song-block {
     grid-template-columns: 1fr !important;
+    row-gap: 1.25rem;
   }
   .course-page.web-mode .song-column {
     border-left: none;
+    border-top: 1px solid #ececf2;
     padding-left: 0;
+    padding-top: 1rem;
+  }
+  .course-page.web-mode .song-column:first-child {
+    border-top: none;
+    padding-top: 0;
   }
   .course-page.web-mode .doc-logo {
     width: 120px;
