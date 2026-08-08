@@ -262,6 +262,8 @@
 
 "@electron/node-gyp@https://github.com/electron/node-gyp#06b29aafb7708acef8b3669835c8a7857ebc92d2":
   version "10.2.0-electron.1"
+  resolved "git+ssh://git@github.com/electron/node-gyp.git#06b29aafb7708acef8b3669835c8a7857ebc92d2"
+  integrity sha512-vrnkDg+mh6ix9PISDcjMwwyxaLI4qU6UOM8anOI/st4smh0Y5kqsoRpwl8vwL4zHjKUU/zZF8tTOOrlhp4u0SQ==
   dependencies:
     env-paths "^2.2.0"
     exponential-backoff "^3.1.1"
@@ -381,6 +383,7 @@
   resolved "file:apps/editor"
   dependencies:
     "@gms/guitar-markdown" "0.1.0"
+    "@gms/renderer-fretboard" "0.1.0"
     "@gms/renderer-svguitar" "0.1.0"
     "@gms/renderer-vexflow" "0.1.0"
     dompurify "^3.2.6"
@@ -394,6 +397,10 @@
 "@gms/guitar-markdown@0.1.0", "@gms/guitar-markdown@file:/Users/jganet/Dev/Jerem/guitar-markdown-studio-desktop/packages/guitar-markdown":
   version "0.1.0"
   resolved "file:packages/guitar-markdown"
+
+"@gms/renderer-fretboard@0.1.0", "@gms/renderer-fretboard@file:/Users/jganet/Dev/Jerem/guitar-markdown-studio-desktop/packages/renderer-fretboard":
+  version "0.1.0"
+  resolved "file:packages/renderer-fretboard"
 
 "@gms/renderer-svguitar@0.1.0", "@gms/renderer-svguitar@file:/Users/jganet/Dev/Jerem/guitar-markdown-studio-desktop/packages/renderer-svguitar":
   version "0.1.0"

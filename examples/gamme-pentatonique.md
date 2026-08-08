@@ -14,6 +14,18 @@ tuning: Standard
 
 La gamme pentatonique mineure de La contient cinq notes : **A - C - D - E - G**. C'est la gamme la plus utilisée pour improviser dans les styles blues, rock et pop, car elle "sonne juste" sur la quasi-totalité d'une grille en tonalité de La mineur ou de Do majeur. Elle se joue en cinq positions ("boîtes") qui se répètent le long du manche ; ce cours détaille les deux premières, les plus utilisées.
 
+Vue d'ensemble du manche : en gris, toutes les notes de la gamme sur les 12 premières cases ; en noir, les positions 1 et 2 détaillées plus bas. Les notes racines (La) sont annotées "A".
+
+```scale
+frets: 0-12
+e: 0|3|[5,A]|[8]|[10]|12
+B: 1|3|[5]|[8]|[10,A]
+G: 0|2,A|[5]|[7]|[9]|12
+D: 0|2|[5]|[7,A]|[10]|12
+A: 0,A|3|[5]|[7]|[10]|12,A
+E: 0|3|[5,A]|[8]|[10]|12
+```
+
 ```columns
 ```
 

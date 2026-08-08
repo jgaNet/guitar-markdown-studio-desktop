@@ -5,6 +5,7 @@ import { DEFAULT_MARKDOWN } from "./default-content.js";
 import { renderMarkdown, parseFrontMatter, renderQrSvg } from "./markdown.js";
 import { renderTablatureSvg, renderScoreSvg } from "@gms/renderer-vexflow";
 import { renderChordDiagrams } from "@gms/renderer-svguitar";
+import { renderFretboardScale } from "@gms/renderer-fretboard";
 import { Bravura } from "../../../node_modules/vexflow/build/esm/src/fonts/bravura.js";
 import { Academico } from "../../../node_modules/vexflow/build/esm/src/fonts/academico.js";
 
@@ -184,6 +185,7 @@ function drawPending(renders) {
     if (render.type === "tab") renderTablatureSvg(render.ast, target, { measureWidth: NOTATION_MEASURE_WIDTH, height: 130, measuresPerRow });
     if (render.type === "partition") renderScoreSvg(render.ast, target, { measureWidth: NOTATION_MEASURE_WIDTH, height: 110, measuresPerRow });
     if (render.type === "chords") renderChordDiagrams(render.ast, target);
+    if (render.type === "scale") renderFretboardScale(render.ast, target);
   }
 }
 

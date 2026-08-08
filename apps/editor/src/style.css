@@ -693,6 +693,14 @@ button:hover,
   max-width: 100%;
   height: auto;
 }
+.fretboard-host {
+  overflow-x: auto;
+}
+.fretboard-host svg {
+  display: block;
+  max-width: 100%;
+  height: auto;
+}
 .svguitar-grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(calc(118px * var(--zoom-scale, 1)), 1fr));

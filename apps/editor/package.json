@@ -10,6 +10,7 @@
   },
   "dependencies": {
     "@gms/guitar-markdown": "0.1.0",
+    "@gms/renderer-fretboard": "0.1.0",
     "@gms/renderer-svguitar": "0.1.0",
     "@gms/renderer-vexflow": "0.1.0",
     "dompurify": "^3.2.6",

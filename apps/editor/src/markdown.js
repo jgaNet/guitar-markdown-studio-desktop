@@ -1,7 +1,7 @@
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
 import qrcode from "qrcode-generator";
-import { parseAsciiTab, parseChordBlock, parseRhythmPattern, parseChordGrid } from "@gms/guitar-markdown";
+import { parseAsciiTab, parseChordBlock, parseRhythmPattern, parseChordGrid, parseScale } from "@gms/guitar-markdown";
 import logoUrl from "./assets/logo.png";
 
 let blockCounter = 0;
@@ -116,6 +116,17 @@ md.renderer.rules.fence = (tokens, index, options, env, self) => {
       return `<figure class="guitar-block chord-block"><div id="${id}" class="svguitar-host"></div></figure>`;
     } catch (error) {
       return `<div class="block-error"><strong>Accords invalides</strong><p>${escapeHtml(error.message)}</p></div>`;
+    }
+  }
+
+  if (language === "scale") {
+    const id = `gms-scale-${blockCounter++}`;
+    try {
+      const ast = parseScale(token.content);
+      pendingRenders.push({ type: "scale", id, ast });
+      return `<figure class="guitar-block scale-block"><div id="${id}" class="fretboard-host"></div></figure>`;
+    } catch (error) {
+      return `<div class="block-error"><strong>Diagramme de gamme invalide</strong><p>${escapeHtml(error.message)}</p></div>`;
     }
   }
 
