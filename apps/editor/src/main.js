@@ -47,6 +47,7 @@ app.innerHTML = `
       <label class="button browser-import">Importer<input id="import-file" type="file" accept=".md,.markdown" hidden></label>
       <button id="download-md">Enregistrer .md</button>
       <button id="reset">Exemple</button>
+      <button id="share-btn" type="button">Partager</button>
       <button id="view-only-btn" type="button">Aperçu client</button>
       <button id="print" class="primary">Imprimer / PDF</button>
     </div>
@@ -71,18 +72,18 @@ app.innerHTML = `
   </nav>
   <section class="workspace">
     <button id="edit-toggle" class="edit-toggle" type="button" hidden>✎ Éditer</button>
-    <div class="view-only-toolbar" id="view-only-toolbar" hidden>
-      <button id="vo-exit-edit" type="button">✎ Éditer</button>
-      <button id="vo-print" type="button" hidden>Imprimer / PDF</button>
-      <button id="vo-print-book" type="button" hidden>Imprimer (Livret)</button>
-      <button id="vo-print-poster" type="button" hidden>Imprimer (Poster)</button>
-    </div>
     <section class="pane editor-pane" id="editor-pane">
       <div class="pane-title" id="editor-pane-title">Markdown</div>
       <textarea id="editor" spellcheck="false"></textarea>
     </section>
     <div class="resizer" id="pane-resizer"></div>
     <section class="pane preview-pane">
+      <div class="view-only-toolbar" id="view-only-toolbar" hidden>
+        <button id="vo-exit-edit" type="button">✎ Éditer</button>
+        <button id="vo-print" type="button" hidden>Imprimer / PDF</button>
+        <button id="vo-print-book" type="button" hidden>Imprimer (Livret)</button>
+        <button id="vo-print-poster" type="button" hidden>Imprimer (Poster)</button>
+      </div>
       <div class="pane-title pane-title-row">
         <span id="preview-pane-title">Preview</span>
         <div class="mode-switch" role="group" aria-label="Mode de mise en page">
@@ -112,6 +113,7 @@ const editorPaneTitle = document.querySelector("#editor-pane-title");
 const previewPaneTitle = document.querySelector("#preview-pane-title");
 const previewPaneHeader = previewPaneTitle.closest(".pane-title");
 const viewOnlyButton = document.querySelector("#view-only-btn");
+const shareButton = document.querySelector("#share-btn");
 const viewOnlyToolbar = document.querySelector("#view-only-toolbar");
 const voExitEditButton = document.querySelector("#vo-exit-edit");
 const voPrintButton = document.querySelector("#vo-print");
@@ -703,6 +705,10 @@ function updatePrintModeButtons() {
   voPrintButton.hidden = webMode || hidePrintButtons;
   voPrintBookButton.hidden = !webMode || hidePrintButtons;
   voPrintPosterButton.hidden = !webMode || hidePrintButtons;
+  // Web mode's view-only toolbar sits as a footer instead of a header —
+  // Book/Poster keep it at the top, matching where the normal pane header
+  // would be.
+  previewPane.classList.toggle("web-toolbar-footer", webMode && viewOnly);
 }
 
 function setViewMode(mode) {
@@ -754,6 +760,55 @@ function currentModeToken() {
   if (fitToPage) return "poster";
   return "book";
 }
+
+function toBase64(text) {
+  const bytes = new TextEncoder().encode(text);
+  let binary = "";
+  bytes.forEach(byte => { binary += String.fromCharCode(byte); });
+  return btoa(binary);
+}
+
+function fromBase64(base64) {
+  const binary = atob(base64);
+  const bytes = Uint8Array.from(binary, char => char.charCodeAt(0));
+  return new TextDecoder().decode(bytes);
+}
+
+async function copyToClipboard(text) {
+  if (navigator.clipboard?.writeText) {
+    try {
+      await navigator.clipboard.writeText(text);
+      return true;
+    } catch (error) {
+      console.error("navigator.clipboard.writeText a échoué :", error);
+    }
+  }
+  try {
+    const textarea = document.createElement("textarea");
+    textarea.value = text;
+    textarea.style.position = "fixed";
+    textarea.style.opacity = "0";
+    document.body.append(textarea);
+    textarea.select();
+    document.execCommand("copy");
+    textarea.remove();
+    return true;
+  } catch (error) {
+    console.error("Copie via execCommand a échoué :", error);
+    return false;
+  }
+}
+
+shareButton.addEventListener("click", async () => {
+  const params = new URLSearchParams();
+  params.set("doc", toBase64(editor.value));
+  params.set("mode", currentModeToken());
+  params.set("view", "only");
+  params.set("edit", "hide");
+  const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+  const copied = await copyToClipboard(url);
+  status.textContent = copied ? "Lien copié" : "Erreur de copie";
+});
 
 viewOnlyButton.addEventListener("click", () => {
   viewOnly = true;
@@ -911,13 +966,21 @@ const VIEW_MODE_PARAM = { book: "standard", poster: "landscape", web: "web" };
 
 async function loadFromQueryParams() {
   const params = new URLSearchParams(window.location.search);
+  const doc = params.get("doc");
   const src = params.get("src");
   const requestedMode = VIEW_MODE_PARAM[params.get("mode")] ?? "web";
   viewOnly = params.get("view") === "only";
   hideEditButton = params.get("edit") === "hide";
   hidePrintButtons = params.get("print") === "hide";
   applyCompactMode();
-  if (src) {
+  if (doc) {
+    try {
+      editor.value = fromBase64(doc);
+    } catch (error) {
+      status.textContent = "Erreur de chargement";
+      console.error("Impossible de décoder le document :", error);
+    }
+  } else if (src) {
     try {
       status.textContent = "Chargement…";
       const response = await fetch(src);

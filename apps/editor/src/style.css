@@ -149,23 +149,52 @@ button:hover,
   display: none;
 }
 .view-only-toolbar {
-  position: absolute;
-  bottom: 0.75rem;
-  right: 0.75rem;
-  z-index: 20;
+  /* A slim in-flow header, sticky within the preview's own scroll — unlike
+     a floating overlay, it reserves its own space instead of covering
+     content underneath as the page scrolls (an issue on narrow/mobile
+     Web-mode views, where the toolbar could hide several lines of text). */
+  position: sticky;
+  top: 0;
+  left: 0;
+  z-index: 2;
+  grid-row: 1;
   display: flex;
-  flex-direction: column;
-  align-items: flex-end;
-  gap: 0.4rem;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: center;
+  gap: 0.35rem;
+  padding: 0.35rem 0.5rem;
+  background: #f8f9fb;
+  border-bottom: 1px solid #e5e7eb;
 }
 .view-only-toolbar[hidden] {
   display: none;
+}
+.preview-pane.web-toolbar-footer {
+  /* Both rows size to their own content (not 1fr/viewport-based) so the
+     footer's true flow position is at the actual end of the (usually much
+     taller than the viewport) page — otherwise sticky bottom has nothing
+     real to stick against and the footer ends up anchored near the top of
+     the scrollable content instead of its bottom. */
+  grid-template-rows: auto auto;
+}
+.preview-pane.web-toolbar-footer #preview-scale-wrapper {
+  grid-row: 1;
+}
+.preview-pane.web-toolbar-footer .view-only-toolbar {
+  grid-row: 2;
+  position: static;
+  margin-top: 1.5rem;
+  border-bottom: none;
+  border-top: 1px solid #e5e7eb;
 }
 .view-only-toolbar button {
   background: #332466;
   color: #fff;
   border-color: #332466;
-  box-shadow: 0 4px 14px rgb(31 41 55 / 25%);
+  padding: 0.32rem 0.6rem;
+  font-size: 0.78rem;
+  border-radius: 6px;
 }
 .view-only-toolbar button:hover {
   background: #241a4d;
@@ -231,6 +260,7 @@ button:hover,
   top: 0;
   left: 0;
   z-index: 2;
+  grid-row: 1;
   padding-top: 0.35rem;
   padding-bottom: 0.35rem;
 }
@@ -256,6 +286,7 @@ button:hover,
 #preview-scale-wrapper {
   overflow: visible;
   align-self: start;
+  grid-row: 2;
 }
 .mode-switch {
   display: inline-flex;
@@ -749,8 +780,12 @@ details {
   font-size: 0.8rem;
   color: #6b7280;
 }
-details pre {
-  overflow: auto;
+pre {
+  /* A long unbreakable line otherwise paints outside the box without
+     widening it, which still drags the whole page's scrollable area wider
+     — contain the overflow locally instead. */
+  overflow-x: auto;
+  max-width: 100%;
 }
 @media (max-width: 900px) {
   .topbar {
