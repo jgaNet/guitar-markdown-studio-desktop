@@ -1,5 +1,6 @@
 import MarkdownIt from "markdown-it";
 import DOMPurify from "dompurify";
+import qrcode from "qrcode-generator";
 import { parseAsciiTab, parseChordBlock, parseRhythmPattern, parseChordGrid } from "@gms/guitar-markdown";
 import logoUrl from "./assets/logo.png";
 
@@ -60,6 +61,10 @@ function renderHeader(data) {
     .filter(([, value]) => value)
     .map(([key, value]) => {
       const label = META_LABELS[key] ?? key.charAt(0).toUpperCase() + key.slice(1);
+      const bpm = key === "tempo" ? /(\d+(?:\.\d+)?)/.exec(value)?.[1] : null;
+      if (bpm) {
+        return `<button type="button" class="meta-pill meta-pill-tempo" data-bpm="${bpm}" title="Écouter le métronome"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)}</button>`;
+      }
       return `<span class="meta-pill"><strong>${escapeHtml(label)}</strong> ${escapeHtml(value)}</span>`;
     })
     .join("");
@@ -200,6 +205,87 @@ md.renderer.rules.fence = (tokens, index, options, env, self) => {
   return defaultFence(tokens, index, options, env, self);
 };
 
+export function renderQrSvg(data) {
+  try {
+    const qr = qrcode(0, "M");
+    qr.addData(data);
+    qr.make();
+    return qr.createSvgTag({ scalable: true });
+  } catch {
+    return "";
+  }
+}
+
+function extractYoutubeId(url) {
+  let parsed;
+  try {
+    parsed = new URL(url);
+  } catch {
+    return null;
+  }
+  const host = parsed.hostname.replace(/^www\.|^m\./, "");
+  let id = null;
+  if (host === "youtu.be") {
+    id = parsed.pathname.slice(1).split("/")[0];
+  } else if (host === "youtube.com" || host === "youtube-nocookie.com") {
+    if (parsed.pathname === "/watch") id = parsed.searchParams.get("v");
+    else {
+      const match = /^\/(?:embed|shorts)\/([^/]+)/.exec(parsed.pathname);
+      if (match) id = match[1];
+    }
+  }
+  // Keep this strict — it ends up directly in an embed iframe's src.
+  return id && /^[\w-]{6,15}$/.test(id) ? id : null;
+}
+
+function isAudioUrl(url) {
+  return /\.(mp3|wav|ogg|oga|m4a|flac|aac|opus|weba)(?:[?#].*)?$/i.test(url);
+}
+
+// Standard markdown links ([text](url), or a bare autolinked URL via the
+// linkify option) render as a normal clickable link in web mode; in the
+// print modes (Book/Poster) they instead render as a QR code with the link
+// text beside it — or the URL itself when the text IS the URL, i.e. a bare
+// autolinked link with no separate title. A YouTube link or a direct audio
+// file link additionally embeds a player in web mode instead of showing
+// the plain link. All variants are always emitted; CSS shows only the one
+// matching the current mode.
+md.renderer.rules.link_open = (tokens, index, options, env, self) => {
+  const token = tokens[index];
+  const href = token.attrGet("href") ?? "";
+  const isEmbedded = !!extractYoutubeId(href) || isAudioUrl(href);
+  token.attrSet("class", isEmbedded ? "link-web link-web-embedded" : "link-web");
+  token.attrSet("target", "_blank");
+  token.attrSet("rel", "noopener noreferrer");
+  return self.renderToken(tokens, index, options);
+};
+md.renderer.rules.link_close = (tokens, index, options) => {
+  let openIndex = index - 1;
+  let depth = 0;
+  while (openIndex >= 0) {
+    if (tokens[openIndex].type === "link_close") depth += 1;
+    else if (tokens[openIndex].type === "link_open") {
+      if (depth === 0) break;
+      depth -= 1;
+    }
+    openIndex -= 1;
+  }
+  const href = tokens[openIndex]?.attrGet("href") ?? "";
+  const label = tokens
+    .slice(openIndex + 1, index)
+    .map(token => token.content ?? "")
+    .join("")
+    .trim() || href;
+  const youtubeId = extractYoutubeId(href);
+  const embedHtml = youtubeId
+    ? `<span class="link-embed"><iframe src="https://www.youtube-nocookie.com/embed/${youtubeId}" title="${escapeHtml(label)}" loading="lazy" allowfullscreen allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share" referrerpolicy="strict-origin-when-cross-origin"></iframe></span>`
+    : isAudioUrl(href)
+      ? `<span class="link-embed link-embed-audio"><audio controls preload="none" src="${escapeHtml(href)}"></audio><span class="link-embed-audio-label">${escapeHtml(label)}</span></span>`
+      : "";
+  const qrSvg = renderQrSvg(href);
+  return `</a>${embedHtml}<a class="link-print" href="${escapeHtml(href)}" target="_blank" rel="noopener noreferrer"><span class="link-qr">${qrSvg}</span><span class="link-print-label">${escapeHtml(label)}</span></a>`;
+};
+
 export function renderMarkdown(source) {
   blockCounter = 0;
   pendingRenders.length = 0;
@@ -207,5 +293,11 @@ export function renderMarkdown(source) {
   currentTimeSignature = data.time ?? "4/4";
   const headerHtml = renderHeader(data);
   const bodyHtml = md.render(content);
-  return { html: DOMPurify.sanitize(headerHtml + bodyHtml), renders: [...pendingRenders] };
+  return {
+    html: DOMPurify.sanitize(headerHtml + bodyHtml, {
+      ADD_TAGS: ["iframe"],
+      ADD_ATTR: ["target", "allow", "allowfullscreen", "loading", "referrerpolicy"],
+    }),
+    renders: [...pendingRenders],
+  };
 }

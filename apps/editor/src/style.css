@@ -327,7 +327,10 @@ button:hover,
   width: 297mm;
   min-height: 0;
   height: 210mm;
-  padding: 14mm 15mm;
+  /* Same as .landscape-column's own left padding/gap between columns, so
+     the outer margin doesn't look disproportionately larger than the
+     spacing between columns. */
+  padding: 1rem;
 }
 .course-page.web-mode {
   width: 100%;
@@ -341,6 +344,74 @@ button:hover,
 .course-page.web-mode .page-break,
 .course-page.web-mode .column-break,
 .course-page.web-mode .landscape-page-break {
+  display: none;
+}
+.link-web {
+  color: #332466;
+  font-weight: 650;
+  text-decoration: underline;
+}
+.link-print {
+  /* Block instead of inline — a QR code is much taller than a line of
+     text, so keeping it inline (mid-sentence) fights the text baseline and
+     looks visually shifted. Breaking onto its own line avoids that. It's
+     still an <a> — the QR is meant for a printed page, but on screen (the
+     app's own preview, or a view-only link) it's just as clickable. */
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin: 0.4rem 0;
+  color: inherit;
+  text-decoration: none;
+}
+.link-qr {
+  display: inline-block;
+  width: 16mm;
+  height: 16mm;
+  flex: 0 0 auto;
+}
+.link-qr svg {
+  width: 100%;
+  height: 100%;
+}
+.link-print-label {
+  font-weight: 650;
+  word-break: break-word;
+}
+.course-page.web-mode .link-print {
+  display: none;
+}
+.course-page:not(.web-mode) .link-web {
+  display: none;
+}
+.link-embed {
+  display: none;
+}
+.course-page.web-mode .link-embed {
+  display: block;
+  margin: 0.5rem 0;
+}
+.link-embed iframe {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  border: 0;
+  border-radius: 8px;
+}
+.course-page.web-mode .link-embed.link-embed-audio {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.6rem;
+}
+.link-embed-audio audio {
+  flex: 1 1 260px;
+  min-width: 220px;
+}
+.link-embed-audio-label {
+  font-weight: 650;
+}
+.course-page.web-mode .link-web.link-web-embedded {
   display: none;
 }
 @media (max-width: 600px) {
@@ -394,6 +465,12 @@ button:hover,
 }
 .landscape-column-inner {
   transform-origin: top left;
+  /* Contain the first child's top margin instead of letting it collapse
+     through and escape above this box — otherwise scrollHeight undercounts
+     the true visual footprint by that margin, and the scale computed from
+     it isn't enough to keep the last section inside the column's
+     overflow:hidden bound. */
+  display: flow-root;
 }
 .page-break {
   position: relative;
@@ -489,6 +566,7 @@ button:hover,
   color: #332466;
 }
 .doc-header {
+  position: relative;
   display: flex;
   flex-direction: column;
   align-items: center;
@@ -498,6 +576,35 @@ button:hover,
   padding-bottom: 1.1rem;
   border-bottom: 3px solid #d8c8ff;
   break-inside: avoid;
+}
+.doc-header-qr {
+  position: absolute;
+  top: 0;
+  right: 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.15rem;
+  color: #6b7280;
+  text-decoration: none;
+}
+.doc-header-qr-code {
+  display: block;
+  width: 20mm;
+  height: 20mm;
+}
+.doc-header-qr-code svg {
+  width: 100%;
+  height: 100%;
+}
+.doc-header-qr-label {
+  font-size: 0.6rem;
+  text-align: center;
+}
+.course-page img {
+  max-width: 100%;
+  height: auto;
+  border-radius: 8px;
 }
 .doc-logo {
   width: 170px;
@@ -538,6 +645,20 @@ button:hover,
 }
 .meta-pill strong {
   color: #332466;
+}
+.meta-pill-tempo {
+  cursor: pointer;
+}
+.meta-pill-tempo:hover {
+  background: #ebe3ff;
+}
+.meta-pill-tempo.active {
+  background: #332466;
+  color: #fff;
+  border-color: #332466;
+}
+.meta-pill-tempo.active strong {
+  color: #fff;
 }
 .course-page blockquote {
   margin: 1rem 0;
@@ -840,7 +961,7 @@ pre {
   .course-page.landscape-fit {
     width: 297mm;
     height: 210mm;
-    padding: 14mm 15mm;
+    padding: 1rem;
   }
   .course-page.landscape-fit + .course-page.landscape-fit {
     break-before: page;

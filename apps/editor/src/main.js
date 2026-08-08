@@ -2,7 +2,7 @@ import "./style.css";
 import styleCssText from "./style.css?raw";
 import logoUrl from "./assets/logo.png";
 import { DEFAULT_MARKDOWN } from "./default-content.js";
-import { renderMarkdown, parseFrontMatter } from "./markdown.js";
+import { renderMarkdown, parseFrontMatter, renderQrSvg } from "./markdown.js";
 import { renderTablatureSvg, renderScoreSvg } from "@gms/renderer-vexflow";
 import { renderChordDiagrams } from "@gms/renderer-svguitar";
 import { Bravura } from "../../../node_modules/vexflow/build/esm/src/fonts/bravura.js";
@@ -19,9 +19,12 @@ const COMPACT_BREAKPOINT = "(max-width: 1100px)";
 const PAGE_HEIGHT_MM = 297;
 const PAGE_WIDTH_MM = 210;
 const PRINT_MARGIN_MM = 14;
-const PAGE_CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - 2 * PRINT_MARGIN_MM;
-const LANDSCAPE_CONTENT_HEIGHT_MM = PAGE_WIDTH_MM - 2 * PRINT_MARGIN_MM;
 const MM_TO_PX = 96 / 25.4;
+const PAGE_CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - 2 * PRINT_MARGIN_MM;
+// Poster's own outer margin is 1rem (matching .landscape-column's left
+// padding/gap in style.css — see the comment there), not PRINT_MARGIN_MM.
+const LANDSCAPE_MARGIN_PX = 16;
+const LANDSCAPE_CONTENT_HEIGHT_MM = PAGE_WIDTH_MM - (2 * LANDSCAPE_MARGIN_PX) / MM_TO_PX;
 const PREVIEW_GUTTER_PX = 64;
 const PAGE_FIT_MIN_SCALE = 0.35;
 const RHYTHM_FIT_MIN_SCALE = 0.4;
@@ -29,6 +32,12 @@ const GRID_FIT_MIN_SCALE = 0.45;
 const app = document.querySelector("#app");
 const saved = localStorage.getItem(STORAGE_KEY) ?? DEFAULT_MARKDOWN;
 let currentFilePath = null;
+// The URL the current document was loaded from via ?src=, if any — reused
+// by the header QR code so it can link to that (short) address instead of
+// embedding the full document, which quickly exceeds what a QR code can
+// hold. Deliberately not cleared on further local edits; the QR staying
+// slightly stale is a better trade-off than it disappearing entirely.
+let currentSrcUrl = null;
 let fitToPage = false;
 let webMode = false;
 let viewOnly = false;
@@ -68,6 +77,7 @@ app.innerHTML = `
       <button data-insert="columnbreak">Saut de colonne (mode optimisé)</button>
       <button data-insert="columns">Colonnes</button>
       <button data-insert="zoom">Zoom</button>
+      <button data-insert="link">Lien</button>
     </div>
     <span class="grow"></span>
   </nav>
@@ -139,6 +149,7 @@ const snippets = {
   columnbreak: `\n\`\`\`columnbreak\n\`\`\`\n`,
   columns: `\n\`\`\`columns\n\`\`\`\n\n\`\`\`column\n\`\`\`\n\n\`\`\`endcolumns\n\`\`\`\n`,
   zoom: `\n\`\`\`zoom 0.8\n\`\`\`\n\n\`\`\`endzoom\n\`\`\`\n`,
+  link: `[Continuer en ligne](https://exemple.com)`,
 };
 
 const NOTATION_MEASURE_WIDTH = 220;
@@ -422,13 +433,34 @@ function rescaleLandscapeColumns() {
     // match the actual print output.
     pageBox.style.width = `${PAGE_HEIGHT_MM * MM_TO_PX}px`;
     pageBox.querySelectorAll(".landscape-column-inner").forEach(inner => {
+      inner.style.transformOrigin = "top left";
       inner.style.transform = "";
       inner.style.width = "";
-      const naturalHeight = inner.scrollHeight;
-      const scale = Math.max(PAGE_FIT_MIN_SCALE, Math.min(1, usableHeightPx / naturalHeight));
-      inner.style.transformOrigin = "top left";
-      inner.style.transform = `scale(${scale})`;
-      inner.style.width = `${100 / scale}%`;
+      // The column's own content-area width (clientWidth minus its padding)
+      // — read via the rendered box itself rather than clientWidth directly,
+      // since clientWidth includes padding and inner (a normal-flow child)
+      // doesn't render inside that padding.
+      const columnWidthPx = inner.getBoundingClientRect().width;
+      let naturalHeight = inner.scrollHeight;
+      // Widening the box to fill the column after scaling (so it doesn't
+      // look like it shrunk in both dimensions) can itself change how the
+      // content reflows at that new width, which in turn changes how much
+      // it needs to shrink — each correction can nudge the next, so iterate
+      // a few times until it settles instead of overflowing the column's
+      // overflow:hidden bound by a residual few pixels and clipping content.
+      for (let i = 0; i < 5; i += 1) {
+        const scale = Math.max(PAGE_FIT_MIN_SCALE, Math.min(1, usableHeightPx / naturalHeight));
+        inner.style.transform = `scale(${scale})`;
+        // A fixed pixel width, not a percentage — a percentage gets
+        // re-resolved against the column's width wherever this renders next
+        // (a print/PDF pass in particular can resolve it a pixel or two
+        // differently than the screen preview did), reflowing the content
+        // again and silently invalidating the scale it was computed from.
+        inner.style.width = `${columnWidthPx / scale}px`;
+        const settledHeight = inner.scrollHeight;
+        if (settledHeight === naturalHeight) break;
+        naturalHeight = settledHeight;
+      }
     });
     pageBox.style.width = "";
   });
@@ -477,6 +509,28 @@ function applyPageFit() {
 
   buildLandscapeStructure();
   rescaleLandscapeColumns();
+  // Content images load asynchronously — if one hasn't finished yet at
+  // measurement time, the column looks shorter than it truly is, so the
+  // computed scale ends up too generous and whatever comes after the image
+  // (e.g. a later section) overflows the fixed-height column and gets
+  // clipped once the image actually expands. Re-measure once everything is
+  // settled to correct for that.
+  const pendingImages = [...previewWrapper.querySelectorAll("img")]
+    .filter(img => !img.complete)
+    .map(img => new Promise(resolve => {
+      img.addEventListener("load", resolve, { once: true });
+      img.addEventListener("error", resolve, { once: true });
+    }));
+  Promise.all([document.fonts.ready, ...pendingImages]).then(() => {
+    if (!fitToPage) return;
+    rescaleLandscapeColumns();
+    // The column width this correction settles on can differ from the one
+    // fitChordGrids/fitRhythmBlocks already shrank text to fit — re-run
+    // them against the final width, or a grid/rhythm block sized for the
+    // stale width can end up overflowing its cell with no further check.
+    fitChordGrids();
+    fitRhythmBlocks();
+  });
 }
 
 function applyCompactMode() {
@@ -555,11 +609,76 @@ function applyEditorWidth() {
   editorPane.style.width = `${width}px`;
 }
 
+let metronomeContext = null;
+let metronomeTimer = null;
+let metronomeActiveButton = null;
+
+function playMetronomeClick() {
+  const context = metronomeContext;
+  const oscillator = context.createOscillator();
+  const gain = context.createGain();
+  oscillator.frequency.value = 1000;
+  gain.gain.setValueAtTime(0.4, context.currentTime);
+  gain.gain.exponentialRampToValueAtTime(0.001, context.currentTime + 0.05);
+  oscillator.connect(gain);
+  gain.connect(context.destination);
+  oscillator.start();
+  oscillator.stop(context.currentTime + 0.05);
+}
+
+function stopMetronome() {
+  if (metronomeTimer) {
+    clearInterval(metronomeTimer);
+    metronomeTimer = null;
+  }
+  metronomeActiveButton?.classList.remove("active");
+  metronomeActiveButton = null;
+}
+
+function startMetronome(bpm, button) {
+  stopMetronome();
+  if (!metronomeContext) metronomeContext = new AudioContext();
+  playMetronomeClick();
+  metronomeTimer = setInterval(playMetronomeClick, 60000 / bpm);
+  metronomeActiveButton = button;
+  button.classList.add("active");
+}
+
+preview.addEventListener("click", event => {
+  const button = event.target.closest(".meta-pill-tempo");
+  if (!button) return;
+  const bpm = Number(button.dataset.bpm);
+  if (!bpm) return;
+  if (metronomeActiveButton === button) stopMetronome();
+  else startMetronome(bpm, button);
+});
+
 function update() {
   try {
+    // The pill button this may be pointing at is about to be destroyed and
+    // rebuilt below — an orphaned interval with no way to click-to-stop it
+    // would otherwise keep clicking forever.
+    stopMetronome();
     const result = renderMarkdown(editor.value);
     preview.innerHTML = result.html;
     preview.classList.toggle("web-mode", webMode);
+    // Book/Poster are print-oriented and not clickable — a QR to the same
+    // document's Web view lets a reader jump straight to the live version
+    // from a printed page. Web mode doesn't need it: it's already that view.
+    const headerEl = preview.querySelector(".doc-header");
+    if (!webMode && headerEl) {
+      const webUrl = buildHeaderQrUrl();
+      const qrSvg = renderQrSvg(webUrl);
+      // A too-long document with no known hosted URL overflows what a QR
+      // code can hold — renderQrSvg returns "" in that case; skip quietly
+      // rather than show a broken code.
+      if (qrSvg) {
+        headerEl.insertAdjacentHTML(
+          "beforeend",
+          `<a class="doc-header-qr" href="${escapeHtml(webUrl)}" target="_blank" rel="noopener noreferrer" title="Ouvrir la version web"><span class="doc-header-qr-code">${qrSvg}</span><span class="doc-header-qr-label">Version web</span></a>`,
+        );
+      }
+    }
     const { data } = parseFrontMatter(editor.value);
     document.title = data.title ? slugify(data.title) : "Guitar Markdown Studio";
     applyColumnSections();
@@ -813,14 +932,30 @@ async function copyToClipboard(text) {
   }
 }
 
-shareButton.addEventListener("click", async () => {
+function buildShareUrl(mode) {
   const params = new URLSearchParams();
   params.set("doc", toBase64(editor.value));
-  params.set("mode", currentModeToken());
+  params.set("mode", mode);
   params.set("view", "only");
   params.set("edit", "hide");
-  const url = `${window.location.origin}${window.location.pathname}?${params.toString()}`;
-  const copied = await copyToClipboard(url);
+  return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+}
+
+function buildHeaderQrUrl() {
+  // Prefer linking back to the document's own hosted URL when known — far
+  // shorter than embedding the whole document, which quickly exceeds what
+  // a QR code can encode (a few KB at most) for any real lesson.
+  const params = new URLSearchParams();
+  if (currentSrcUrl) params.set("src", currentSrcUrl);
+  else params.set("doc", toBase64(editor.value));
+  params.set("mode", "web");
+  params.set("view", "only");
+  params.set("edit", "hide");
+  return `${window.location.origin}${window.location.pathname}?${params.toString()}`;
+}
+
+shareButton.addEventListener("click", async () => {
+  const copied = await copyToClipboard(buildShareUrl(currentModeToken()));
   status.textContent = copied ? "Lien copié" : "Erreur de copie";
 });
 
@@ -1011,6 +1146,7 @@ async function loadFromQueryParams() {
       const response = await fetch(normalizeSrcUrl(src));
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       editor.value = await response.text();
+      currentSrcUrl = src;
     } catch (error) {
       status.textContent = "Erreur de chargement";
       console.error("Impossible de charger le document distant :", error);

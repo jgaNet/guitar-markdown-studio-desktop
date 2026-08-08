@@ -72,6 +72,12 @@ A|----------------|------------------|
 E|----------------|------------------|
 \`\`\`
 
+## Illustration
+
+Une image classique en markdown (\`![texte alternatif](url)\`) s'insère aussi bien dans le cours — utile pour une photo de position de main, un schéma, etc.
+
+![Position de la main](https://placehold.co/640x360?text=Position+de+la+main)
+
 ## Rythmique
 
 \`\`\`rhythm
@@ -144,4 +150,10 @@ Le [G]voyage s'achève, mais la musique [D]reste en [Em]nous.
 1. Jouer chaque mesure à 60 BPM.
 2. Monter progressivement jusqu'à 76 BPM.
 3. Conserver un mouvement régulier de la main droite.
+
+## Ressources
+
+Retrouve la [vidéo de démonstration](https://www.youtube.com/watch?v=dQw4w9WgXcQ) de ce morceau. En mode Web, un lien YouTube s'affiche directement comme une vidéo intégrée ; en mode Livret ou Poster il devient un QR code à scanner.
+
+Écoute aussi une [piste audio d'exemple](https://www.soundhelix.com/examples/mp3/SoundHelix-Song-1.mp3) : un lien direct vers un fichier audio (.mp3, .wav...) s'affiche en mode Web comme un lecteur audio intégré.
 `;
