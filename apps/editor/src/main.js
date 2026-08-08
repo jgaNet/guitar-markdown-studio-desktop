@@ -22,6 +22,7 @@ const PRINT_MARGIN_MM = 14;
 const PAGE_CONTENT_HEIGHT_MM = PAGE_HEIGHT_MM - 2 * PRINT_MARGIN_MM;
 const LANDSCAPE_CONTENT_HEIGHT_MM = PAGE_WIDTH_MM - 2 * PRINT_MARGIN_MM;
 const MM_TO_PX = 96 / 25.4;
+const PREVIEW_GUTTER_PX = 64;
 const PAGE_FIT_MIN_SCALE = 0.35;
 const RHYTHM_FIT_MIN_SCALE = 0.4;
 const GRID_FIT_MIN_SCALE = 0.45;
@@ -711,11 +712,24 @@ function updatePrintModeButtons() {
   previewPane.classList.toggle("web-toolbar-footer", webMode && viewOnly);
 }
 
+function optimizeEditorWidthForMode(mode) {
+  // Book/Poster are fixed-size A4 pages (not responsive) — snap the editor
+  // pane so the preview area matches the page's on-screen width instead of
+  // leaving it arbitrarily wide/narrow from a previous manual drag. Web
+  // mode's layout is responsive already, so it's left untouched.
+  if (mode === "web") return;
+  const targetPageWidthPx = (mode === "landscape" ? PAGE_HEIGHT_MM : PAGE_WIDTH_MM) * MM_TO_PX;
+  editorWidth = workspace.clientWidth - RESIZER_WIDTH - targetPageWidthPx - PREVIEW_GUTTER_PX;
+  applyEditorWidth();
+  localStorage.setItem(EDITOR_WIDTH_KEY, String(editorWidth));
+}
+
 function setViewMode(mode) {
   const nextFitToPage = mode === "landscape";
   const nextWebMode = mode === "web";
   fitToPage = nextFitToPage;
   webMode = nextWebMode;
+  optimizeEditorWidthForMode(mode);
   modePortraitButton.classList.toggle("active", mode === "standard");
   modePortraitButton.setAttribute("aria-pressed", String(mode === "standard"));
   modeLandscapeButton.classList.toggle("active", mode === "landscape");
@@ -964,6 +978,17 @@ document.querySelector("#import-file")?.addEventListener("change", async event =
 
 const VIEW_MODE_PARAM = { book: "standard", poster: "landscape", web: "web" };
 
+function normalizeSrcUrl(url) {
+  // github.com/.../blob/... is GitHub's HTML file-viewer page, not raw text
+  // — fetching it would load a webpage instead of the markdown source. If
+  // it's the URL you'd naturally copy from GitHub's UI, rewrite it to the
+  // equivalent raw.githubusercontent.com URL, which does serve plain text.
+  const match = /^https:\/\/github\.com\/([^/]+)\/([^/]+)\/blob\/([^/]+)\/([^?#]+)/.exec(url);
+  if (!match) return url;
+  const [, owner, repo, ref, path] = match;
+  return `https://raw.githubusercontent.com/${owner}/${repo}/${ref}/${path}`;
+}
+
 async function loadFromQueryParams() {
   const params = new URLSearchParams(window.location.search);
   const doc = params.get("doc");
@@ -983,7 +1008,7 @@ async function loadFromQueryParams() {
   } else if (src) {
     try {
       status.textContent = "Chargement…";
-      const response = await fetch(src);
+      const response = await fetch(normalizeSrcUrl(src));
       if (!response.ok) throw new Error(`HTTP ${response.status}`);
       editor.value = await response.text();
     } catch (error) {
