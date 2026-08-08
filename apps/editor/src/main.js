@@ -466,6 +466,36 @@ function rescaleLandscapeColumns() {
   });
 }
 
+function fitPosterPageToViewport() {
+  // A view-only link is read on a single screen, not scrolled through while
+  // editing — maximize each landscape page, using whichever of width/height
+  // is the tighter constraint against the A4-landscape page's own ratio.
+  // Must run after rescaleLandscapeColumns, which resets pageBox width to ""
+  // at the end of every call.
+  const pageBoxes = [...document.querySelectorAll(".course-page.landscape-fit")];
+  pageBoxes.forEach(pageBox => {
+    pageBox.style.transform = "";
+    pageBox.style.width = "";
+    pageBox.style.height = "";
+  });
+  if (!viewOnly || pageBoxes.length === 0) return;
+  const naturalWidth = pageBoxes[0].offsetWidth;
+  const naturalHeight = pageBoxes[0].offsetHeight;
+  const availableWidth = previewPane.clientWidth;
+  const availableHeight = previewPane.clientHeight;
+  const scale = Math.max(
+    PAGE_FIT_MIN_SCALE,
+    Math.min(1, availableWidth / naturalWidth, availableHeight / naturalHeight),
+  );
+  if (scale >= 1) return;
+  pageBoxes.forEach(pageBox => {
+    pageBox.style.transformOrigin = "top left";
+    pageBox.style.transform = `scale(${scale})`;
+    pageBox.style.width = `${naturalWidth * scale}px`;
+    pageBox.style.height = `${naturalHeight * scale}px`;
+  });
+}
+
 function resetPreviewVisibility() {
   preview.classList.remove("landscape-fit");
   preview.style.transform = "";
@@ -490,21 +520,8 @@ function fitBookPageToWidth() {
   const naturalWidth = preview.offsetWidth;
   const naturalHeight = preview.offsetHeight;
   const availableWidth = previewPane.clientWidth;
-  let scale;
-  if (viewOnly) {
-    // A view-only link is read on a single screen, not scrolled through
-    // while editing — maximize it, using whichever of width/height is the
-    // tighter constraint (against the A4 page's own dimensions, not the
-    // document's actual — possibly multi-page — content height, so a
-    // short single-page lesson fills the screen as large as possible).
-    const availableHeight = previewPane.clientHeight;
-    scale = Math.min(1, availableWidth / naturalWidth, availableHeight / (PAGE_HEIGHT_MM * MM_TO_PX));
-  } else {
-    if (availableWidth >= naturalWidth) return;
-    scale = availableWidth / naturalWidth;
-  }
-  scale = Math.max(PAGE_FIT_MIN_SCALE, scale);
-  if (scale >= 1) return;
+  if (availableWidth >= naturalWidth) return;
+  const scale = Math.max(PAGE_FIT_MIN_SCALE, Math.min(1, availableWidth / naturalWidth));
   preview.style.transformOrigin = "top left";
   preview.style.transform = `scale(${scale})`;
   previewWrapper.style.width = `${naturalWidth * scale}px`;
@@ -522,6 +539,7 @@ function applyPageFit() {
 
   buildLandscapeStructure();
   rescaleLandscapeColumns();
+  fitPosterPageToViewport();
   // Content images load asynchronously — if one hasn't finished yet at
   // measurement time, the column looks shorter than it truly is, so the
   // computed scale ends up too generous and whatever comes after the image
@@ -537,6 +555,7 @@ function applyPageFit() {
   Promise.all([document.fonts.ready, ...pendingImages]).then(() => {
     if (!fitToPage) return;
     rescaleLandscapeColumns();
+    fitPosterPageToViewport();
     // The column width this correction settles on can differ from the one
     // fitChordGrids/fitRhythmBlocks already shrank text to fit — re-run
     // them against the final width, or a grid/rhythm block sized for the
@@ -736,8 +755,12 @@ window.addEventListener("resize", () => {
       update();
       return;
     }
-    if (fitToPage) rescaleLandscapeColumns();
-    else renderPageBreaks();
+    if (fitToPage) {
+      rescaleLandscapeColumns();
+      fitPosterPageToViewport();
+    } else {
+      renderPageBreaks();
+    }
     fitRhythmBlocks();
     fitChordGrids();
     applyZoomScale();
