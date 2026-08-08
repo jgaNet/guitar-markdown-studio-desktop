@@ -92,3 +92,11 @@ Les deux premiers couplets originaux du cantique (1779, domaine public).
 3. Joue l'arpège en chantant (ou en fredonnant) la mélodie en même temps.
 4. Une fois à l'aise, ralentis à 50 BPM et travaille la précision, puis remonte progressivement jusqu'à 80 BPM.
 5. Termine en jouant les deux couplets en entier avec l'arpège, sans t'arrêter entre les lignes.
+
+## Ressources
+
+![Partition originale d'Amazing Grace](https://upload.wikimedia.org/wikipedia/commons/b/bf/AmazingGraceFamiliarStyle.PNG)
+
+Regarde ce [tutoriel guitare fingerstyle](https://www.youtube.com/watch?v=DbnlUJ1nBO8) pour une version plus élaborée du morceau.
+
+Écoute aussi cet [enregistrement historique du domaine public](https://upload.wikimedia.org/wikipedia/commons/8/88/Amazing_grace.ogg) (Bibliothèque du Congrès, 1939).
