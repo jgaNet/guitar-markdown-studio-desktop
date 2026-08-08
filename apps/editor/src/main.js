@@ -490,8 +490,21 @@ function fitBookPageToWidth() {
   const naturalWidth = preview.offsetWidth;
   const naturalHeight = preview.offsetHeight;
   const availableWidth = previewPane.clientWidth;
-  if (availableWidth >= naturalWidth) return;
-  const scale = Math.max(PAGE_FIT_MIN_SCALE, Math.min(1, availableWidth / naturalWidth));
+  let scale;
+  if (viewOnly) {
+    // A view-only link is read on a single screen, not scrolled through
+    // while editing — maximize it, using whichever of width/height is the
+    // tighter constraint (against the A4 page's own dimensions, not the
+    // document's actual — possibly multi-page — content height, so a
+    // short single-page lesson fills the screen as large as possible).
+    const availableHeight = previewPane.clientHeight;
+    scale = Math.min(1, availableWidth / naturalWidth, availableHeight / (PAGE_HEIGHT_MM * MM_TO_PX));
+  } else {
+    if (availableWidth >= naturalWidth) return;
+    scale = availableWidth / naturalWidth;
+  }
+  scale = Math.max(PAGE_FIT_MIN_SCALE, scale);
+  if (scale >= 1) return;
   preview.style.transformOrigin = "top left";
   preview.style.transform = `scale(${scale})`;
   previewWrapper.style.width = `${naturalWidth * scale}px`;
@@ -955,9 +968,22 @@ function buildHeaderQrUrl() {
 }
 
 shareButton.addEventListener("click", async () => {
-  const copied = await copyToClipboard(buildShareUrl(currentModeToken()));
+  // Always the Web view, regardless of what mode is currently active —
+  // that's the format meant for sharing with a student.
+  const copied = await copyToClipboard(buildShareUrl("web"));
   status.textContent = copied ? "Lien copié" : "Erreur de copie";
 });
+
+function syncViewStateFromUrl() {
+  const params = new URLSearchParams(window.location.search);
+  const requestedMode = VIEW_MODE_PARAM[params.get("mode")] ?? "web";
+  viewOnly = params.get("view") === "only";
+  hideEditButton = params.get("edit") === "hide";
+  hidePrintButtons = params.get("print") === "hide";
+  applyCompactMode();
+  setViewMode(requestedMode);
+}
+window.addEventListener("popstate", syncViewStateFromUrl);
 
 viewOnlyButton.addEventListener("click", () => {
   viewOnly = true;
@@ -965,7 +991,9 @@ viewOnlyButton.addEventListener("click", () => {
   const params = new URLSearchParams(window.location.search);
   params.set("view", "only");
   params.set("mode", currentModeToken());
-  history.replaceState(null, "", `${window.location.pathname}?${params.toString()}`);
+  // pushState, not replaceState — so the browser's back button has an
+  // actual previous entry (the editing view) to return to.
+  history.pushState(null, "", `${window.location.pathname}?${params.toString()}`);
 });
 voExitEditButton.addEventListener("click", () => {
   viewOnly = false;
